@@ -1,0 +1,36 @@
+# One DuckDB target for the demo; external catalogs are defined in catalogs.yml.
+aws_cloud_cost:
+  target: catalog_demo
+  outputs:
+    catalog_demo:
+      type: duckdb
+      path: ".tmp/aws_cloud_cost.duckdb"
+      schema: aws_cloud_cost
+      threads: 4
+      settings:
+        allow_unsigned_extensions: true
+      secrets:
+        - type: s3
+          name: minio_secret
+          key_id: minio-root-user
+          secret: minio-root-password
+          endpoint: "localhost:19000"
+          url_style: path
+          use_ssl: false
+        - type: iceberg
+          name: polaris_oauth
+          client_id: "{{ env_var('POLARIS_ID', '') }}"
+          client_secret: "{{ env_var('POLARIS_SECRET', '') }}"
+          oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
+          oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
+          oauth2_grant_type: "client_credentials"
+        - type: iceberg
+          name: snowflake_oauth
+          client_id: ""
+          client_secret: "{{ env_var('HORIZON_PAT', '') }}"
+          oauth2_server_uri: "{{ env_var('SNOWFLAKE_OAUTH2_SERVER_URI', '') or env_var('HORIZON_OAUTH2_SERVER_URI', '') or ((env_var('SNOWFLAKE_CATALOG_URI', '') or env_var('HORIZON_ENDPOINT', 'https://example.snowflakecomputing.com/polaris/api/catalog')) ~ '/v1/oauth/tokens') }}"
+          oauth2_scope: "{{ env_var('SNOWFLAKE_OAUTH2_SCOPE', '') or env_var('HORIZON_OAUTH2_SCOPE', 'session:role:ACCOUNTADMIN') }}"
+          oauth2_grant_type: "client_credentials"
+        - type: iceberg
+          name: databricks_token
+          token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
