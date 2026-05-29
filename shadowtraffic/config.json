@@ -1,0 +1,26 @@
+{
+  "generators": [
+    {
+      "connection": "local_files",
+      "directory": "/home/output",
+      "fileConfigs": {
+        "filePrefix": "aws_cost_report-",
+        "format": "parquet"
+      },
+      "localConfigs": {
+        "throttleMs": 0,
+        "maxEvents": __SHADOWTRAFFIC_MAX_EVENTS__
+      },
+      "data": "__AWS_CLOUD_COST_REPORT_DATA__"
+    }
+  ],
+  "connections": {
+    "local_files": {
+      "kind": "fileSystem",
+      "batchConfigs": {
+        "lingerMs": 3600000,
+        "batchElements": __SHADOWTRAFFIC_MAX_EVENTS__
+      }
+    }
+  }
+}

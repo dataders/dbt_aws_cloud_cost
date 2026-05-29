@@ -1,0 +1,159 @@
+services:
+  lakekeeper:
+    image: quay.io/lakekeeper/catalog:latest-main
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
+    command: ["serve"]
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      interval: 1s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    ports:
+      - "18181:8181"
+    networks:
+      - iceberg_net
+
+  migrate:
+    image: quay.io/lakekeeper/catalog:latest-main
+    environment:
+      - LAKEKEEPER__PG_ENCRYPTION_KEY=This-is-NOT-Secure!
+      - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
+      - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
+    restart: "no"
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - iceberg_net
+
+  bootstrap:
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/bootstrap"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - '{"accept-terms-of-use": true}'
+      - "-o"
+      - "/dev/null"
+    networks:
+      - iceberg_net
+
+  initialwarehouse:
+    image: curlimages/curl
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+      createbuckets:
+        condition: service_completed_successfully
+    restart: "no"
+    command:
+      - -w
+      - "%{http_code}"
+      - "-X"
+      - "POST"
+      - "-v"
+      - "http://lakekeeper:8181/management/v1/warehouse"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - |
+        {
+          "warehouse-name": "demo",
+          "project-id": "00000000-0000-0000-0000-000000000000",
+          "storage-profile": {
+            "type": "s3",
+            "bucket": "examples",
+            "key-prefix": "initial-warehouse",
+            "endpoint": "http://minio:9000",
+            "region": "local-01",
+            "path-style-access": true,
+            "flavor": "minio",
+            "sts-enabled": true
+          },
+          "storage-credential": {
+            "type": "s3",
+            "credential-type": "access-key",
+            "access-key-id": "minio-root-user",
+            "secret-access-key": "minio-root-password"
+          }
+        }
+      - "-o"
+      - "/dev/null"
+    networks:
+      - iceberg_net
+
+  db:
+    image: postgres:17
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5432 -d postgres"]
+      interval: 2s
+      timeout: 10s
+      retries: 2
+      start_period: 10s
+    networks:
+      - iceberg_net
+
+  minio:
+    image: minio/minio
+    environment:
+      - MINIO_ROOT_USER=minio-root-user
+      - MINIO_ROOT_PASSWORD=minio-root-password
+    command: ["server", "--console-address", ":9001", "/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 10s
+      retries: 2
+      start_period: 15s
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    networks:
+      - iceberg_net
+
+  createbuckets:
+    image: minio/minio
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set dockerminio http://minio:9000 minio-root-user minio-root-password;
+      /usr/bin/mc mb --ignore-existing dockerminio/examples;
+      exit 0;
+      "
+    networks:
+      - iceberg_net
+
+networks:
+  iceberg_net:
