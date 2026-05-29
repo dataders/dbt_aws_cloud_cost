@@ -5,13 +5,18 @@ package-lock.yml
 dbt_modules/
 dbt_packages/
 logs/
-profiles.yml
 target/
 *.log
+*.duckdb
+*.ducklake
+*.ducklake.*
+ducklake.db
+!.gitkeep
 
 # IDE files
 .idea/
 .vscode/
+.serena/
 *~
 *.swp
 *.swo
@@ -52,22 +57,25 @@ var/
 wheels/
 
 # Secrets and credentials
+.env
 .env.*
+.user.yml
 .secrets
 credentials.json
 service-account.json
 
 # Temporary files
+.tmp/
 .cache/
 *.temp
 *.tmp
 
 # Virtual environments
 .conda/
-.env
 .venv
 ENV/
 env/
 env.bak/
 venv/
 venv.bak/
+dbt_internal_packages/
