@@ -1,39 +1,28 @@
+with source as (
 
-with base as (
-
-    select * 
+    select *
     from {{ ref('stg_aws_cloud_cost__report_base') }}
 ),
 
 fields as (
 
     select
-        {{
-            fivetran_utils.fill_staging_columns(
-                source_columns=adapter.get_columns_in_relation(ref('stg_aws_cloud_cost__report_base')),
-                staging_columns=get_aws_cloud_cost_report_columns()
-            )
-        }}
-        
-        {{ aws_cloud_cost.aws_cloud_cost_source_relation(
-                connection_dictionary=var('aws_cloud_cost_sources', []),
-                single_schema=var('aws_cloud_cost_schema', 'aws_cloud_cost'),
-                single_database=var('aws_cloud_cost_schema', target.database),
-                single_table_identifier=var("aws_cloud_cost_report_identifier", "aws_cost_report")
-            ) 
-        }}
-    from base
+        '{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}.{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}' as source_relation,
+        {% for col in get_aws_cloud_cost_report_columns() %}
+        try_cast(nullif(cast({{ col.name }} as {{ dbt.type_string() }}), '') as {{ col.datatype }}) as {{ col.name }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    from source
 ),
 
 final as (
-    
-    select 
-        source_relation, 
+
+    select
+        source_relation,
         _file,
         {{ aws_cloud_cost_trim( dbt.concat([ dbt.split_part('_file', "'/'", 1), "'/'", dbt.split_part('_file', "'/'", 2) ]) ) }} as report,
         _line,
         _modified,
-        max(_modified) over (partition by bill_billing_period_start_date {{ ", source_relation" if var('aws_cloud_cost_sources', []) | length > 1 }}) = _modified as is_latest_file_version,
+        max(_modified) over (partition by bill_billing_period_start_date) = _modified as is_latest_file_version,
         bill_bill_type as bill_type,
         bill_billing_entity as billing_entity,
         bill_billing_period_start_date as billing_period_start_date,
@@ -58,40 +47,30 @@ final as (
         line_item_usage_account_id as usage_account_id,
         line_item_usage_account_name as usage_account_name,
         line_item_usage_amount as usage_amount,
-        line_item_usage_end_date as usage_end_date,
-        line_item_usage_start_date as usage_start_date,
+        coalesce(line_item_usage_end_date, bill_billing_period_end_date) as usage_end_date,
+        coalesce(line_item_usage_start_date, bill_billing_period_start_date) as usage_start_date,
         line_item_usage_type as usage_type,
         pricing_public_on_demand_cost as public_on_demand_cost,
         pricing_public_on_demand_rate as public_on_demand_rate,
         pricing_purchase_option as purchase_option,
         pricing_term,
         coalesce(pricing_unit, product_pricing_unit) as pricing_unit,
-        product_fee_code, 
+        product_fee_code,
         product_fee_description,
-
-        -- info about product
-        product_product_name as product_name,
+        coalesce(product_product_name, nullif(regexp_extract(product, '"product_name":"([^"]+)"', 1), '')) as product_name,
         product_product_family as product_family,
         product_servicecode as product_service_code,
-
-        -- instances 
         product_instance_type as instance_type,
         product_instance_family as instance_family,
-
-        -- Location data for s3 buckets
         product_location as location,
         product_location_type as location_type,
         product_region_code as region_code,
-
-        -- Location data for data movement (maybe remove from defaults?)
         product_from_location as from_location,
         product_from_location_type as from_location_type,
         product_from_region_code as from_region_code,
         product_to_location as to_location,
         product_to_location_type as to_location_type,
         product_to_region_code as to_region_code,
-
-        -- default: only include reservation + savings plan numeric fields, dimensions can be added via passthroughs
         reservation_amortized_upfront_cost_for_usage,
         reservation_amortized_upfront_fee_for_billing_period,
         reservation_effective_cost,
@@ -111,14 +90,11 @@ final as (
         savings_plan_savings_plan_effective_cost as savings_plan_effective_cost,
         savings_plan_savings_plan_rate as savings_plan_rate,
         savings_plan_total_commitment_to_date,
-        savings_plan_used_commitment 
-
-        {{ fivetran_utils.fill_pass_through_columns('aws_cloud_cost_report_pass_through_columns') }}
-
+        savings_plan_used_commitment
     from fields
 )
 
 select *
 from final
 where is_latest_file_version
-and billing_period_start_date >= '{{ var("aws_cloud_cost_start_date", "1970-01-01") }}'
+and cast(billing_period_start_date as date) >= '{{ var("aws_cloud_cost_start_date", "1970-01-01") }}'

@@ -2,13 +2,11 @@ version: 2
 
 sources:
   - name: aws_cloud_cost
-    database: '{% if target.type not in ("spark") %}{{ var("aws_cloud_cost_database", target.database) }}{% endif %}'
-    schema: '{{ var("aws_cloud_cost_schema", "aws_cloud_cost") }}'
-    config:
-      enabled: "{{ var('aws_cloud_cost_sources', []) == [] }}"
+    catalog: "{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}"
+    schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', 'aws_cloud_cost') }}"
     tables: &aws_report
       - name: report
-        identifier: '{{ var("aws_cloud_cost_report_identifier", "aws_cost_report") }}'
+        identifier: "{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}"
         description: '{{ doc("aws_cloud_cost_report") }}'
         columns:
           - name: _file
@@ -215,4 +213,3 @@ sources:
             description: '{{ doc("savings_plan_amortized_upfront_commitment_for_billing_period") }}'
           - name: savings_plan_total_commitment_to_date
             description: '{{ doc("savings_plan_total_commitment_to_date") }}'
-

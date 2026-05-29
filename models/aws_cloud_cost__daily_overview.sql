@@ -41,7 +41,7 @@ usage_account_names as (
             usage_account_id,
             usage_account_name,
             source_relation,
-            row_number() over (partition by usage_account_id {{ ", source_relation" if var('aws_cloud_cost_sources', []) | length > 1 }} order by latest_start_date desc) = 1 as is_latest_name
+            row_number() over (partition by usage_account_id order by latest_start_date desc) = 1 as is_latest_name
         from usage_account_mapping
     ) as sub where is_latest_name
 ),
@@ -73,7 +73,7 @@ billing_account_names as (
             bill_payer_account_id,
             bill_payer_account_name,
             source_relation,
-            row_number() over (partition by bill_payer_account_id {{ ", source_relation" if var('aws_cloud_cost_sources', []) | length > 1 }} order by latest_start_date desc) = 1 as is_latest_name
+            row_number() over (partition by bill_payer_account_id order by latest_start_date desc) = 1 as is_latest_name
         from billing_account_mapping
     ) as sub where is_latest_name
 ),
@@ -139,9 +139,7 @@ fields as (
         from_region_code,
         to_location,
         to_location_type,
-        to_region_code
-
-        {{ fivetran_utils.persist_pass_through_columns(pass_through_variable='aws_cloud_cost_report_pass_through_columns') }},
+        to_region_code,
 
         {# Usage Metrics #}
         cast(sum(coalesce(usage_amount, 0)) as {{ dbt.type_numeric() }}) as usage_amount,
@@ -192,7 +190,7 @@ fields as (
         on source_report.usage_account_id = usage_account_names.usage_account_id
         and source_report.source_relation = usage_account_names.source_relation
 
-    {{ dbt_utils.group_by(n=41 + var('aws_cloud_cost_report_pass_through_columns',[])|length) }}
+    {{ dbt_utils.group_by(n=41) }}
 ),
 
 final as (
@@ -240,12 +238,6 @@ final as (
         'to_region_code'
     ] 
 -%}
-
-{# Add passthrough columns to unique key in case they affect the grain. #}
-{% for field in var('aws_cloud_cost_report_pass_through_columns', [])  -%}
-    {% set field_name = field.alias|default(field.name)|lower %}
-    {% do composite_key.append(field_name) %}
-{% endfor -%}
 
     select 
         *, 
