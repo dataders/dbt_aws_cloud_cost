@@ -11,11 +11,11 @@ models:
     staging:
       +materialized: table
     aws_cloud_cost__daily_overview:
-      +catalog: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'lakekeeper') }}"
+      +catalog_name: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'unity') }}"
     aws_cloud_cost__daily_instance_report:
-      +catalog: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'lakekeeper') }}"
+      +catalog_name: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'unity') }}"
     aws_cloud_cost__daily_product_report:
-      +catalog: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'lakekeeper') }}"
+      +catalog_name: "{{ env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'unity') }}"
 
 vars:
   aws_cloud_cost_start_date: "1970-01-01"

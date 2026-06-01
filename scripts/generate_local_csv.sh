@@ -9,7 +9,8 @@ set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 ROWS=${1:-10000}
 LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-/Users/dataders/Developer/dotfiles_env/shadowtraffic/license.env}
-DUCKDB_CLI=${DUCKDB_CLI:-/Users/dataders/Developer/duckdb-iceberg.codex-catalog-write-compat-stack/build/release/duckdb}
+DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options}
+DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
 DUCKDB_HOME=${DUCKDB_HOME:-$ROOT/.tmp/duckdb-home}
 MODIFIED_AT=${AWS_CLOUD_COST_MODIFIED_AT:-2026-05-28 00:00:00.000}
 CONTAINER=dbt-aws-cloud-cost-localcsv

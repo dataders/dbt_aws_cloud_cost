@@ -7,14 +7,16 @@ catalogs:
         root_path: "./local_files"
         file_format: csv
 
-  - name: lakekeeper
+  - name: unity
     type: iceberg_rest
     table_format: iceberg
     config:
       duckdb:
-        endpoint: "http://localhost:18181/catalog"
-        warehouse: "demo"
-        authorization_type: "NONE"
-        access_delegation_mode: "NONE"
-        attach_as: "lakekeeper"
-        default_schema: "default"
+        endpoint: "{{ env_var('DATABRICKS_HOST', 'https://example.cloud.databricks.com') }}/api/2.1/unity-catalog/iceberg-rest"
+        warehouse: "{{ env_var('DATABRICKS_CATALOG', 'dbt_dataders') }}"
+        secret: databricks_token
+        authorization_type: "OAUTH2"
+        access_delegation_mode: "VENDED_CREDENTIALS"
+        default_region: "{{ env_var('DATABRICKS_DEFAULT_REGION', 'us-west-2') }}"
+        attach_as: "unity"
+        default_schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"

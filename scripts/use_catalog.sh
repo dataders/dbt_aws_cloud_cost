@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 # Select the active output catalog for the demo's models.
-# Usage: scripts/use_catalog.sh <ducklake|lakekeeper|horizon|polaris>
+# Usage: scripts/use_catalog.sh <ducklake|lakekeeper|horizon|polaris|unity>
 # Writes catalogs.yml with local_files (CSV source) + the chosen output catalog,
 # so only the active catalog is attached. Also prints the env var to export.
-#
-# Note: unity (Databricks UC) is intentionally NOT a write target — UC's Iceberg
-# REST catalog implements only read endpoints (no createTable), see
-# https://github.com/unitycatalog/unitycatalog/issues/3
 set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 TARGET=${1:-lakekeeper}
@@ -69,10 +65,10 @@ horizon() {
         authorization_type: "OAUTH2"
         access_delegation_mode: "VENDED_CREDENTIALS"
         default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-west-2') }}"
-        support_stage_create: false
-        use_transaction_commit: false
+        stage_create_tables: false
+        disable_multi_table_commit: true
         skip_create_table_metadata_updates: true
-        allow_deletes: false
+        remove_files_on_delete: false
         attach_as: "horizon"
         default_schema: "{{ env_var('HORIZON_SCHEMA', '') or env_var('SNOWFLAKE_SCHEMA', 'AWS_CLOUD_COST') }}"
 YAML
@@ -97,9 +93,28 @@ polaris() {
 YAML
 }
 
+unity() {
+  cat <<'YAML'
+
+  - name: unity
+    type: iceberg_rest
+    table_format: iceberg
+    config:
+      duckdb:
+        endpoint: "{{ env_var('DATABRICKS_HOST', 'https://example.cloud.databricks.com') }}/api/2.1/unity-catalog/iceberg-rest"
+        warehouse: "{{ env_var('DATABRICKS_CATALOG', 'dbt_dataders') }}"
+        secret: databricks_token
+        authorization_type: "OAUTH2"
+        access_delegation_mode: "VENDED_CREDENTIALS"
+        default_region: "{{ env_var('DATABRICKS_DEFAULT_REGION', 'us-west-2') }}"
+        attach_as: "unity"
+        default_schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"
+YAML
+}
+
 case "$TARGET" in
-  ducklake|lakekeeper|horizon|polaris) ;;
-  *) echo "usage: $0 <ducklake|lakekeeper|horizon|polaris>" >&2; exit 1 ;;
+  ducklake|lakekeeper|horizon|polaris|unity) ;;
+  *) echo "usage: $0 <ducklake|lakekeeper|horizon|polaris|unity>" >&2; exit 1 ;;
 esac
 
 { base; "$TARGET"; } > "$ROOT/catalogs.yml"

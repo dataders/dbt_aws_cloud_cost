@@ -6,10 +6,10 @@ CREDENTIALS_JSON=${SNOWFLAKE_CREDENTIALS_JSON:-/Users/dataders/Developer/dotfile
 LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-/Users/dataders/Developer/dotfiles_env/shadowtraffic/license.env}
 POLARIS_ENV=${POLARIS_ENV:-/Users/dataders/Developer/dotfiles_env/secrets.zsh}
 FS_DBT_BIN=${DBT_BIN:-/Users/dataders/Developer/fs.codex-duckdb-catalog-stack-combined/target/debug/dbt}
-DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.codex-catalog-write-compat-stack}
-DUCKDB_DRIVER_LIB=${DUCKDB_DRIVER_LIB:-$DUCKDB_BUILD_DIR/build/release/src/libduckdb.dylib}
-DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/release/duckdb}
-DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-$DUCKDB_BUILD_DIR/build/release/repository}
+DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options}
+DUCKDB_DRIVER_LIB=${DUCKDB_DRIVER_LIB:-$DUCKDB_BUILD_DIR/build/debug/src/libduckdb.dylib}
+DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
+DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-$DUCKDB_BUILD_DIR/build/debug/repository}
 DUCKDB_HOME=${DUCKDB_HOME:-$ROOT/.tmp/duckdb-home}
 ADBC_REPOSITORY=${ADBC_REPOSITORY:-$ROOT/.tmp/adbc-lib}
 DISABLE_CDN_DRIVER_CACHE=${DISABLE_CDN_DRIVER_CACHE:-true}
@@ -134,6 +134,7 @@ for existing_env_name in \
   HORIZON_CLIENT_SECRET \
   HORIZON_PAT \
   HORIZON_OAUTH2_SERVER_URI \
+  HORIZON_OAUTH2_SCOPE \
   POLARIS_ACCESS_DELEGATION_MODE \
   POLARIS_DEFAULT_REGION \
   POLARIS_ID \

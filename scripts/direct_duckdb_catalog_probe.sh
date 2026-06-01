@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT=${0:A:h:h}
-DUCK=${DUCKDB_CLI:-/Users/dataders/Developer/duckdb-iceberg.codex-catalog-write-compat-stack/build/release/duckdb}
-ICEBERG_EXT=${DUCKDB_ICEBERG_EXTENSION:-/Users/dataders/Developer/duckdb-iceberg.codex-catalog-write-compat-stack/build/release/extension/iceberg/iceberg.duckdb_extension}
+DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options}
+DUCK=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
+ICEBERG_EXT=${DUCKDB_ICEBERG_EXTENSION:-$DUCKDB_BUILD_DIR/build/debug/extension/iceberg/iceberg.duckdb_extension}
 
 set -a
 source "$ROOT/.env"
@@ -34,7 +35,7 @@ snowflake_region=${SNOWFLAKE_DEFAULT_REGION:-us-west-2}
     "$(quote_sql "$POLARIS_WAREHOUSE")" \
     "$(quote_sql "$POLARIS_URL")" \
     "$(quote_sql "$polaris_region")"
-  printf "ATTACH '%s' AS horizon (TYPE ICEBERG, ENDPOINT '%s', SECRET 'snowflake_oauth', AUTHORIZATION_TYPE 'OAUTH2', ACCESS_DELEGATION_MODE 'VENDED_CREDENTIALS', DEFAULT_REGION '%s', SUPPORT_STAGE_CREATE false, USE_TRANSACTION_COMMIT false, SKIP_CREATE_TABLE_METADATA_UPDATES true, ALLOW_DELETES false);\n" \
+  printf "ATTACH '%s' AS horizon (TYPE ICEBERG, ENDPOINT '%s', SECRET 'snowflake_oauth', AUTHORIZATION_TYPE 'OAUTH2', ACCESS_DELEGATION_MODE 'VENDED_CREDENTIALS', DEFAULT_REGION '%s', STAGE_CREATE_TABLES false, DISABLE_MULTI_TABLE_COMMIT true, SKIP_CREATE_TABLE_METADATA_UPDATES true, REMOVE_FILES_ON_DELETE false);\n" \
     "$(quote_sql "$HORIZON_WAREHOUSE")" \
     "$(quote_sql "$HORIZON_ENDPOINT")" \
     "$(quote_sql "$snowflake_region")"
