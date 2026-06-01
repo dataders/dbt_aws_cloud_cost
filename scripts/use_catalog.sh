@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Select the active output catalog for the demo's models.
-# Usage: scripts/use_catalog.sh <ducklake|lakekeeper|horizon|polaris|unity>
-# Writes catalogs.yml with local_files (CSV source) + the chosen output catalog,
-# so only the active catalog is attached. Also prints the env var to export.
+# Usage: scripts/use_catalog.sh <all|ducklake|lakekeeper|horizon|polaris|unity>
+# Writes catalogs.yml with local_files (CSV source) + either all known catalogs
+# or the chosen output catalog. Also prints the env var to export.
 set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-TARGET=${1:-lakekeeper}
+TARGET=${1:-all}
 
 base() {
   cat <<'YAML'
@@ -89,7 +89,7 @@ polaris() {
         access_delegation_mode: "VENDED_CREDENTIALS"
         default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
         attach_as: "polaris"
-        default_schema: "{{ env_var('POLARIS_NAMESPACE', 'aws_cloud_cost') }}"
+        default_schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', env_var('POLARIS_NAMESPACE', 'aws_cloud_cost')) }}"
 YAML
 }
 
@@ -113,10 +113,16 @@ YAML
 }
 
 case "$TARGET" in
-  ducklake|lakekeeper|horizon|polaris|unity) ;;
-  *) echo "usage: $0 <ducklake|lakekeeper|horizon|polaris|unity>" >&2; exit 1 ;;
+  all|ducklake|lakekeeper|horizon|polaris|unity) ;;
+  *) echo "usage: $0 <all|ducklake|lakekeeper|horizon|polaris|unity>" >&2; exit 1 ;;
 esac
 
-{ base; "$TARGET"; } > "$ROOT/catalogs.yml"
-echo "wrote catalogs.yml with output catalog: $TARGET"
-echo "now run with:  export AWS_CLOUD_COST_TARGET_CATALOG=$TARGET"
+if [ "$TARGET" = all ]; then
+  { base; polaris; ducklake; lakekeeper; horizon; unity; } > "$ROOT/catalogs.yml"
+  echo "wrote catalogs.yml with all catalog definitions"
+  echo "choose a write target with:  export AWS_CLOUD_COST_TARGET_CATALOG=<ducklake|lakekeeper|horizon|polaris|unity>"
+else
+  { base; "$TARGET"; } > "$ROOT/catalogs.yml"
+  echo "wrote catalogs.yml with output catalog: $TARGET"
+  echo "now run with:  export AWS_CLOUD_COST_TARGET_CATALOG=$TARGET"
+fi

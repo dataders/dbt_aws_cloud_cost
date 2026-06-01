@@ -125,7 +125,8 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("type: iceberg_rest", catalogs)
         self.assertIn("endpoint: \"http://localhost:18181/catalog\"", catalogs)
         self.assertIn("type: horizon", catalogs)
-        self.assertIn("type: unity", catalogs)
+        self.assertIn("DATABRICKS_HOST", catalogs)
+        self.assertIn("attach_as: \"unity\"", catalogs)
 
     def test_source_reads_report_from_polaris_catalog_by_default(self):
         source = self.read("models/staging/src_aws_cloud_cost.yml")
