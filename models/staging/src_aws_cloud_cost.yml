@@ -2,11 +2,13 @@ version: 2
 
 sources:
   - name: aws_cloud_cost
-    catalog: "{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}"
-    schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', 'aws_cloud_cost') }}"
+    # catalog: "{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}"
+    # schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', 'aws_cloud_cost') }}"
+    database:  polaris
+    schema: aws_cloud_cost
     tables: &aws_report
       - name: report
-        identifier: "{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}"
+        # identifier: "{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}"
         description: '{{ doc("aws_cloud_cost_report") }}'
         columns:
           - name: _file

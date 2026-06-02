@@ -55,7 +55,7 @@ horizon() {
   cat <<'YAML'
 
   - name: horizon
-    type: horizon
+    type: iceberg_rest
     table_format: iceberg
     config:
       duckdb:

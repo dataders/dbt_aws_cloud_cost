@@ -124,7 +124,9 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("create_if_not_exists: true", catalogs)
         self.assertIn("type: iceberg_rest", catalogs)
         self.assertIn("endpoint: \"http://localhost:18181/catalog\"", catalogs)
-        self.assertIn("type: horizon", catalogs)
+        self.assertIn("attach_as: \"horizon\"", catalogs)
+        self.assertIn("stage_create_tables: false", catalogs)
+        self.assertIn("disable_multi_table_commit: true", catalogs)
         self.assertIn("DATABRICKS_HOST", catalogs)
         self.assertIn("attach_as: \"unity\"", catalogs)
 
@@ -157,6 +159,12 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertNotIn("fivetran_utils", columns)
         self.assertNotIn("add_pass_through_columns", columns)
         self.assertIn('"name": "product"', columns)
+
+    def test_staging_report_avoids_window_functions(self):
+        staging = self.read("models/staging/stg_aws_cloud_cost__report.sql").lower()
+
+        self.assertNotIn(" over (", staging)
+        self.assertIn("latest_file_versions", staging)
 
     def test_union_macros_are_removed(self):
         for relative_path in [

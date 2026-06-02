@@ -4,11 +4,13 @@ aws_cloud_cost:
   outputs:
     catalog_demo:
       type: duckdb
-      path: ".tmp/aws_cloud_cost.duckdb"
+      path: "aws_cloud_cost_demo.duckdb"
       schema: aws_cloud_cost
       threads: 4
       settings:
         allow_unsigned_extensions: true
+        extension_directory: "{{ env_var('DUCKDB_EXTENSION_REPOSITORY', './.tmp/duckdb-extension-repository') }}"
+        custom_extension_repository: "{{ env_var('DUCKDB_EXTENSION_REPOSITORY', './.tmp/duckdb-extension-repository') }}"
       secrets:
         - type: s3
           name: minio_secret
