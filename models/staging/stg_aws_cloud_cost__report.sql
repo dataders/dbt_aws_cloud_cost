@@ -14,6 +14,25 @@ fields as (
     from source
 ),
 
+latest_file_versions as (
+
+    select
+        bill_billing_period_start_date,
+        max(_modified) as latest_modified
+    from fields
+    group by 1
+),
+
+latest_fields as (
+
+    select
+        fields.*,
+        latest_file_versions.latest_modified = fields._modified as is_latest_file_version
+    from fields
+    inner join latest_file_versions
+        on fields.bill_billing_period_start_date is not distinct from latest_file_versions.bill_billing_period_start_date
+),
+
 final as (
 
     select
@@ -22,7 +41,7 @@ final as (
         {{ aws_cloud_cost_trim( dbt.concat([ dbt.split_part('_file', "'/'", 1), "'/'", dbt.split_part('_file', "'/'", 2) ]) ) }} as report,
         _line,
         _modified,
-        max(_modified) over (partition by bill_billing_period_start_date) = _modified as is_latest_file_version,
+        is_latest_file_version,
         bill_bill_type as bill_type,
         bill_billing_entity as billing_entity,
         bill_billing_period_start_date as billing_period_start_date,
@@ -91,7 +110,7 @@ final as (
         savings_plan_savings_plan_rate as savings_plan_rate,
         savings_plan_total_commitment_to_date,
         savings_plan_used_commitment
-    from fields
+    from latest_fields
 )
 
 select *
