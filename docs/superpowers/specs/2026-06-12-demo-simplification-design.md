@@ -43,8 +43,12 @@ credential section.
 - `scripts/generate_local_csv.sh` (ShadowTraffic, optional) writes to
   `seeds/aws_cost_report.csv`; regeneration is "run the script, re-run
   `dbt seed`".
-- Remove the `local_files` source entry / catalog block and any
-  `local_files/` references.
+- Remove the `local_files` catalog block and any `local_files/` references.
+- The base model's `target.type == 'snowflake'` branch and the Snowflake
+  source definition in `models/staging/src_aws_cloud_cost.yml` are **deleted**
+  — the demo's profile is DuckDB-only, so the branch is dead code. The column
+  description blocks currently living on that source move to a seed
+  properties file (`seeds/properties.yml` or equivalent) so the docs survive.
 - **Risk gate:** smoke-test `dbt seed` with the locally built Fusion binary
   *first*. If seeds misbehave on this debug fork, fall back to committing the
   CSV under `local_files/` and keeping `read_csv()` (the rest of the design is
@@ -68,8 +72,12 @@ credential section.
 ### 4. profiles.yml
 
 - Remove eager `CREATE SECRET` statements from the always-run init path so a
-  ducklake run never touches OAuth tokens. Each external catalog's secret
-  setup lives with its catalog block / README section instead.
+  ducklake run never touches OAuth tokens.
+- Mechanism: the `secrets:` entries in `profiles.yml` become **commented-out
+  blocks mirroring the commented catalog blocks** in `catalogs.yml`, each
+  labeled with the catalog that needs it. Activating a credentialed catalog is
+  therefore a **three-edit** operation (catalog block, `+catalog_name`,
+  secret block) — the README's switching section says so explicitly.
 
 ### 5. setup_env.sh
 
@@ -84,6 +92,9 @@ credential section.
   `feature_compat_probe.py`, `direct_duckdb_catalog_probe.sh`,
   `start.sh`/`stop.sh` (Polaris streaming), `doctor.sh`,
   `configure_horizon_schema.sh`, `create_horizon_pat.sh`.
+- Keep (support files used by the kept scripts/tests, not user-facing):
+  `count_aws_cost_rows.sh`, `polaris_shadowtraffic.py`,
+  `snowflake_sql_api.py`, `render_demo_workspace.py`.
 
 ### 7. README rewrite
 
