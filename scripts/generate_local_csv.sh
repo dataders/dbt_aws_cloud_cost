@@ -8,9 +8,11 @@
 set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 ROWS=${1:-10000}
-LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-/Users/dataders/Developer/dotfiles_env/shadowtraffic/license.env}
-DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options}
-DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
+# These defaults assume `direnv allow` already loaded .env (run scripts/setup_env.sh
+# first). Override any of them if you are not using direnv.
+DOTFILES_ENV=${DOTFILES_ENV:-$HOME/Developer/dotfiles_env}
+LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-$DOTFILES_ENV/shadowtraffic/license.env}
+DUCKDB_CLI=${DUCKDB_CLI:-${DUCKDB_BUILD_DIR:+$DUCKDB_BUILD_DIR/build/debug/duckdb}}
 DUCKDB_HOME=${DUCKDB_HOME:-$ROOT/.tmp/duckdb-home}
 MODIFIED_AT=${AWS_CLOUD_COST_MODIFIED_AT:-2026-05-28 00:00:00.000}
 CONTAINER=dbt-aws-cloud-cost-localcsv
@@ -18,6 +20,10 @@ CONTAINER=dbt-aws-cloud-cost-localcsv
 command -v docker >/dev/null || { echo "missing docker" >&2; exit 1; }
 command -v uv >/dev/null || { echo "missing uv" >&2; exit 1; }
 [ -f "$LICENSE_ENV" ] || { echo "missing ShadowTraffic license env: $LICENSE_ENV" >&2; exit 1; }
+[ -n "$DUCKDB_CLI" ] && [ -x "$DUCKDB_CLI" ] || {
+  echo "missing DuckDB CLI: set DUCKDB_CLI (or DUCKDB_BUILD_DIR), or run scripts/setup_env.sh + 'direnv allow' first" >&2
+  exit 1
+}
 
 PARQUET_DIR="$(mktemp -d "$ROOT/.tmp/localcsv-XXXXXX")"
 trap 'rm -rf "$PARQUET_DIR"' EXIT

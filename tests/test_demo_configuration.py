@@ -23,24 +23,26 @@ class DemoConfigurationTest(unittest.TestCase):
             with self.subTest(relative_path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
-    def test_local_file_source_is_static_seed_copy(self):
-        self.assertEqual(
-            self.read("integration_tests/seeds/aws_cost_report.csv"),
-            self.read("local_files/aws_cost_report.csv"),
-        )
+    def test_local_file_source_is_generated_csv_with_report_columns(self):
+        source = self.read("local_files/aws_cost_report.csv")
+        header = source.splitlines()[0]
 
-    def test_project_uses_catalogs_v2_with_static_lakekeeper_output(self):
+        self.assertIn("identity_line_item_id", header)
+        self.assertIn("line_item_unblended_cost", header)
+        self.assertIn("_modified", header)
+        self.assertGreater(len(source.splitlines()), 1)
+
+    def test_project_uses_catalogs_v2_with_env_selected_output(self):
         project = self.read("dbt_project.yml")
 
         self.assertIn("profile: aws_cloud_cost", project)
         self.assertIn("use_catalogs_v2: true", project)
         self.assertNotIn("env_var('CATALOG'", project)
-        self.assertIn("+schema: aws_cloud_cost", project)
-        self.assertIn("+catalog: lakekeeper", project)
-        self.assertIn("+catalog: builtin", project)
+        self.assertIn("env_var('AWS_CLOUD_COST_TARGET_SCHEMA', 'aws_cloud_cost')", project)
+        self.assertIn("env_var('AWS_CLOUD_COST_TARGET_CATALOG', 'unity')", project)
         self.assertIn("staging:\n      +materialized: table", project)
         self.assertNotIn("+database:", project)
-        self.assertNotIn("+catalog_name:", project)
+        self.assertIn("+catalog_name:", project)
         self.assertNotIn("aws_cloud_cost_sources", project)
         self.assertNotIn("aws_cloud_cost_models_catalog", project)
         self.assertNotIn("aws_cloud_cost_source_catalog", project)
@@ -50,11 +52,11 @@ class DemoConfigurationTest(unittest.TestCase):
         envrc = self.read(".envrc")
 
         self.assertIn(
-            "/Users/dataders/Developer/fs.codex-duckdb-catalog-stack-combined/target/debug/dbt",
+            "/Users/dataders/Developer/fs.codex-s3-tables-rest-catalog/target/debug/dbt",
             setup,
         )
         self.assertIn(
-            "/Users/dataders/Developer/duckdb-iceberg.codex-catalog-write-compat-stack",
+            "/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options",
             setup,
         )
         self.assertIn("[ -x \"$FS_DBT_BIN\" ]", setup)
@@ -68,6 +70,9 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("create schema if not exists aws_cloud_cost", setup)
         self.assertIn("create schema if not exists lakekeeper.aws_cloud_cost", setup)
         self.assertIn("http://localhost:18181/catalog/v1/config?warehouse=demo", setup)
+        self.assertIn("write_optional_env AWS_S3_TABLES_WAREHOUSE", setup)
+        self.assertIn("write_optional_env AWS_S3_TABLES_NAMESPACE", setup)
+        self.assertIn("write_optional_env AWS_SECRET_ACCESS_KEY", setup)
         self.assertIn("printf 'ADBC_REPOSITORY=%s\\n'", setup)
         self.assertNotIn("printf 'HORIZON_ACCESS_TOKEN=", setup)
         self.assertNotIn("HORIZON_ACCESS_TOKEN_EXPIRES_AT", setup)
@@ -90,7 +95,7 @@ class DemoConfigurationTest(unittest.TestCase):
 
         self.assertIn("aws_cloud_cost:", profile)
         self.assertIn("type: duckdb", profile)
-        self.assertIn("path: \".tmp/aws_cloud_cost.duckdb\"", profile)
+        self.assertIn("path: \"aws_cloud_cost_demo.duckdb\"", profile)
         self.assertIn("schema: aws_cloud_cost", profile)
         self.assertNotIn("\n      extensions:", profile)
         self.assertNotIn("\n        - httpfs", profile)
@@ -105,9 +110,19 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("name: databricks_token", profile)
         self.assertIn("name: minio_secret", profile)
         self.assertIn("name: polaris_oauth", profile)
+        self.assertIn("name: aws_s3_tables", profile)
+        self.assertIn("provider: credential_chain", profile)
         self.assertIn("endpoint: \"localhost:19000\"", profile)
 
-        for catalog_name in ["local_files", "polaris", "ducklake", "lakekeeper", "horizon", "unity"]:
+        for catalog_name in [
+            "local_files",
+            "polaris",
+            "ducklake",
+            "lakekeeper",
+            "horizon",
+            "unity",
+            "s3_tables",
+        ]:
             with self.subTest(catalog_name=catalog_name):
                 self.assertIn(f"\n  - name: {catalog_name}", catalogs)
 
@@ -129,13 +144,17 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("disable_multi_table_commit: true", catalogs)
         self.assertIn("DATABRICKS_HOST", catalogs)
         self.assertIn("attach_as: \"unity\"", catalogs)
+        self.assertIn("type: s3_tables", catalogs)
+        self.assertIn("AWS_S3_TABLES_WAREHOUSE", catalogs)
+        self.assertIn("secret: aws_s3_tables", catalogs)
+        self.assertNotIn("authorization_type: \"SIGV4\"", catalogs)
 
-    def test_source_reads_report_from_polaris_catalog_by_default(self):
+    def test_snowflake_source_uses_snowflake_env_defaults(self):
         source = self.read("models/staging/src_aws_cloud_cost.yml")
 
-        self.assertIn("env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris')", source)
-        self.assertIn("env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', 'aws_cloud_cost')", source)
-        self.assertIn("env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report')", source)
+        self.assertIn("SNOWFLAKE_SOURCE_DATABASE", source)
+        self.assertIn("SNOWFLAKE_SOURCE_SCHEMA", source)
+        self.assertIn("SNOWFLAKE_SOURCE_TABLE", source)
         self.assertNotIn("{% if", source)
         self.assertNotIn("AWS_CLOUD_COST_SOURCE_EXTERNAL_LOCATION", source)
         self.assertNotIn("aws_cloud_cost_sources", source)
@@ -146,7 +165,8 @@ class DemoConfigurationTest(unittest.TestCase):
         staging = self.read("models/staging/stg_aws_cloud_cost__report.sql")
         columns = self.read("macros/get_aws_cloud_cost_report_columns.sql")
 
-        self.assertIn("select * from {{ source('aws_cloud_cost', 'report') }}", base)
+        self.assertIn("source('aws_cloud_cost', 'report')", base)
+        self.assertIn("from read_csv('{{ csv_path }}', header = true, all_varchar = true)", base)
         self.assertNotIn("union_aws_cost_report_connections", base)
         self.assertNotIn("fivetran_utils", staging)
         self.assertNotIn("aws_cloud_cost_source_relation", staging)
@@ -154,7 +174,7 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("source_relation", staging)
         self.assertIn("env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris')", staging)
         self.assertIn("env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report')", staging)
-        self.assertIn("regexp_extract(product, '\"product_name\":\"([^\"]+)\"', 1)", staging)
+        self.assertIn("aws_cloud_cost_regex_group('product', '\"product_name\":\"([^\"]+)\"', 1)", staging)
         self.assertIn("coalesce(line_item_usage_start_date, bill_billing_period_start_date)", staging)
         self.assertNotIn("fivetran_utils", columns)
         self.assertNotIn("add_pass_through_columns", columns)
@@ -179,13 +199,16 @@ class DemoConfigurationTest(unittest.TestCase):
         readme = self.read("README.md")
 
         for snippet in [
-            "does not ship a dbt wrapper script",
-            "AWS_CLOUD_COST_SOURCE_CATALOG",
-            "final models are hardcoded to the `lakekeeper` catalog",
-            "scripts/start.sh --sample",
-            "--batch-size 10000",
-            "scripts/stop.sh --drop-table",
-            "pyiceberg[s3fs]",
+            "AWS_CLOUD_COST_TARGET_CATALOG",
+            "AWS_CLOUD_COST_TARGET_SCHEMA",
+            "fs.codex-s3-tables-rest-catalog",
+            "duckdb-iceberg.horizon-rest-write-compat-options",
+            "scripts/generate_local_csv.sh 10000",
+            "scripts/use_catalog.sh s3_tables",
+            "AWS_S3_TABLES_WAREHOUSE",
+            "cloud_cost",
+            "`aws_s3_tables`",
+            "credential chain",
             "POLARIS_URL",
             "SNOWFLAKE_CATALOG_URI",
             "scripts/doctor.sh",
@@ -299,6 +322,35 @@ class DemoConfigurationTest(unittest.TestCase):
         self.assertIn("POLARIS_SECRET", profile)
         self.assertIn("POLARIS_OAUTH_SCOPE", profile)
         self.assertIn("PRINCIPAL_ROLE:ALL", profile)
+
+    def test_rendered_s3_tables_workspace_includes_aws_secret(self):
+        import subprocess
+        import sys
+
+        workspace = ROOT / ".tmp" / "test-render-s3-tables"
+        subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "render_demo_workspace.py"),
+                "--workspace",
+                str(workspace),
+                "--include-catalog",
+                "s3_tables",
+            ],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        catalogs = (workspace / "catalogs.yml").read_text()
+        profile = (workspace / "profiles.yml").read_text()
+        self.assertIn("name: s3_tables", catalogs)
+        self.assertIn("AWS_S3_TABLES_WAREHOUSE", catalogs)
+        self.assertIn("name: aws_s3_tables", profile)
+        self.assertIn("provider: credential_chain", profile)
+        self.assertNotIn("snowflake_oauth", profile)
+        self.assertNotIn("databricks_token", profile)
 
     def test_rendered_horizon_workspace_prefers_pat_over_cached_access_token(self):
         import subprocess
@@ -448,8 +500,10 @@ class DemoConfigurationTest(unittest.TestCase):
     def test_schema_name_generation_keeps_catalog_schema_env_override(self):
         macro = self.read("macros/generate_schema_name.sql")
 
+        self.assertIn("AWS_CLOUD_COST_TARGET_SCHEMA", macro)
         self.assertIn("CATALOG_SCHEMA", macro)
         self.assertIn("custom_schema_name == 'aws_cloud_cost'", macro)
+        self.assertIn("custom_schema_name == catalog_schema", macro)
         self.assertIn("target.schema }}_{{ custom_schema_name", macro)
 
 

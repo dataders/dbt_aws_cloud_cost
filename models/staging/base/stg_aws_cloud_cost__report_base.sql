@@ -6,5 +6,10 @@
 -#}
 {%- set csv_path = env_var('AWS_CLOUD_COST_CSV_PATH', 'local_files/aws_cost_report.csv') -%}
 
+{%- if target.type == 'snowflake' -%}
+select *
+from {{ source('aws_cloud_cost', 'report') }}
+{%- else -%}
 select *
 from read_csv('{{ csv_path }}', header = true, all_varchar = true)
+{%- endif -%}

@@ -1,4 +1,5 @@
-# One DuckDB target for the demo; external catalogs are defined in catalogs.yml.
+# Snowflake is the default adapter target for catalog-linked database testing.
+# A DuckDB target is kept for the local REST-catalog demo path.
 aws_cloud_cost:
   target: catalog_demo
   outputs:
@@ -36,3 +37,7 @@ aws_cloud_cost:
         - type: iceberg
           name: databricks_token
           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
+        - type: s3
+          name: aws_s3_tables
+          provider: credential_chain
+          region: "{{ env_var('AWS_REGION', env_var('AWS_DEFAULT_REGION', 'us-west-2')) }}"

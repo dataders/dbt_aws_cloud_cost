@@ -1,17 +1,38 @@
 #!/usr/bin/env bash
+# Generate .env for the dbt multi-catalog demo.
+#
+# Reads credentials from a developer's private dotfiles_env checkout and the two
+# locally built debug binaries this demo depends on, then writes ./.env (consumed
+# by .envrc / direnv). Every input is overridable via the env var named below; a
+# colleague on a different machine should export the ones that differ before
+# running this script. See README.md ("One-time setup") for what each path is.
+#
+# Required, no safe default (export these or the script will tell you what is
+# missing):
+#   DBT_BIN            path to the custom Fusion `dbt` debug binary
+#   DUCKDB_BUILD_DIR   path to the patched duckdb-iceberg build dir
+#
+# Credential sources (default to the maintainer's dotfiles_env layout; override
+# to point at your own):
+#   SNOWFLAKE_CREDENTIALS_JSON, SHADOWTRAFFIC_LICENSE_ENV, POLARIS_ENV
 set -euo pipefail
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-CREDENTIALS_JSON=${SNOWFLAKE_CREDENTIALS_JSON:-/Users/dataders/Developer/dotfiles_env/credentials/fusion.env.json}
-LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-/Users/dataders/Developer/dotfiles_env/shadowtraffic/license.env}
-POLARIS_ENV=${POLARIS_ENV:-/Users/dataders/Developer/dotfiles_env/secrets.zsh}
-FS_DBT_BIN=${DBT_BIN:-/Users/dataders/Developer/fs.codex-duckdb-catalog-stack-combined/target/debug/dbt}
-DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-/Users/dataders/Developer/duckdb-iceberg.horizon-rest-write-compat-options}
-DUCKDB_DRIVER_LIB=${DUCKDB_DRIVER_LIB:-$DUCKDB_BUILD_DIR/build/debug/src/libduckdb.dylib}
-DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
-DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-$DUCKDB_BUILD_DIR/build/debug/repository}
+DOTFILES_ENV=${DOTFILES_ENV:-$HOME/Developer/dotfiles_env}
+CREDENTIALS_JSON=${SNOWFLAKE_CREDENTIALS_JSON:-$DOTFILES_ENV/credentials/fusion.env.json}
+LICENSE_ENV=${SHADOWTRAFFIC_LICENSE_ENV:-$DOTFILES_ENV/shadowtraffic/license.env}
+POLARIS_ENV=${POLARIS_ENV:-$DOTFILES_ENV/secrets.zsh}
+FS_DBT_BIN=${DBT_BIN:-}
+DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-}
+# DUCKDB_DRIVER_LIB / DUCKDB_CLI / DUCKDB_EXTENSION_REPOSITORY are derived from
+# DUCKDB_BUILD_DIR below, after we have a chance to recover both binary paths
+# from a previous .env (so re-running this script does not require re-exporting).
+DUCKDB_DRIVER_LIB=${DUCKDB_DRIVER_LIB:-}
+DUCKDB_CLI=${DUCKDB_CLI:-}
+DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-}
 DUCKDB_HOME=${DUCKDB_HOME:-$ROOT/.tmp/duckdb-home}
 ADBC_REPOSITORY=${ADBC_REPOSITORY:-$ROOT/.tmp/adbc-lib}
+SNOWFLAKE_ADBC_DRIVER_VERSION=${SNOWFLAKE_ADBC_DRIVER_VERSION:-0.21.0.dev+dbt0.21.13}
 DISABLE_CDN_DRIVER_CACHE=${DISABLE_CDN_DRIVER_CACHE:-true}
 DISABLE_AUTO_DRIVER_REBUILD=${DISABLE_AUTO_DRIVER_REBUILD:-true}
 
@@ -74,15 +95,79 @@ write_optional_env() {
 
 require_command jq
 
-[ -f "$CREDENTIALS_JSON" ] || die "missing Snowflake credentials json: $CREDENTIALS_JSON"
-[ -f "$LICENSE_ENV" ] || die "missing ShadowTraffic license env: $LICENSE_ENV"
-[ -x "$FS_DBT_BIN" ] || die "missing executable Fusion dbt binary: $FS_DBT_BIN"
-[ -x "$DUCKDB_CLI" ] || die "missing executable DuckDB CLI: $DUCKDB_CLI"
-[ -f "$DUCKDB_DRIVER_LIB" ] || die "missing DuckDB driver library: $DUCKDB_DRIVER_LIB"
-[ -d "$DUCKDB_EXTENSION_REPOSITORY" ] || die "missing DuckDB extension repository: $DUCKDB_EXTENSION_REPOSITORY"
+# Recover binary paths from a previous .env so re-running does not force the
+# colleague to re-export DBT_BIN / DUCKDB_BUILD_DIR every time.
+if [ -z "$FS_DBT_BIN" ]; then
+  unset DBT_BIN
+  load_existing_env_var DBT_BIN
+  FS_DBT_BIN=${DBT_BIN:-}
+fi
+if [ -z "$DUCKDB_BUILD_DIR" ]; then
+  unset DUCKDB_BUILD_DIR
+  load_existing_env_var DUCKDB_BUILD_DIR
+  DUCKDB_BUILD_DIR=${DUCKDB_BUILD_DIR:-}
+fi
+
+[ -n "$FS_DBT_BIN" ] || die "DBT_BIN is not set.
+  Build the custom Fusion dbt binary, then point DBT_BIN at it, e.g.:
+    cd <your fs worktree> && cargo build --bin dbt
+    export DBT_BIN=<your fs worktree>/target/debug/dbt
+  See README.md > 'Build the two local binaries'."
+[ -n "$DUCKDB_BUILD_DIR" ] || die "DUCKDB_BUILD_DIR is not set.
+  Build the patched duckdb-iceberg debug build, then point DUCKDB_BUILD_DIR at it, e.g.:
+    cd <your duckdb-iceberg worktree> && make debug
+    export DUCKDB_BUILD_DIR=<your duckdb-iceberg worktree>
+  See README.md > 'Build the two local binaries'."
+
+# Derive the DuckDB artifact paths from the build dir unless overridden.
+DUCKDB_DRIVER_LIB=${DUCKDB_DRIVER_LIB:-$DUCKDB_BUILD_DIR/build/debug/src/libduckdb.dylib}
+DUCKDB_CLI=${DUCKDB_CLI:-$DUCKDB_BUILD_DIR/build/debug/duckdb}
+DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-$DUCKDB_BUILD_DIR/build/debug/repository}
+
+[ -f "$CREDENTIALS_JSON" ] || die "missing Snowflake credentials json: $CREDENTIALS_JSON
+  Override with SNOWFLAKE_CREDENTIALS_JSON=/path/to/creds.json (see README.md > 'Credentials')."
+[ -f "$LICENSE_ENV" ] || die "missing ShadowTraffic license env: $LICENSE_ENV
+  Override with SHADOWTRAFFIC_LICENSE_ENV=/path/to/license.env (see README.md > 'Credentials')."
+[ -x "$FS_DBT_BIN" ] || die "DBT_BIN is not an executable file: $FS_DBT_BIN
+  Did you run 'cargo build --bin dbt' in the fs worktree?"
+[ -x "$DUCKDB_CLI" ] || die "missing executable DuckDB CLI: $DUCKDB_CLI
+  Did you run 'make debug' in the duckdb-iceberg worktree (DUCKDB_BUILD_DIR=$DUCKDB_BUILD_DIR)?"
+[ -f "$DUCKDB_DRIVER_LIB" ] || die "missing DuckDB driver library: $DUCKDB_DRIVER_LIB
+  Did you run 'make debug' in the duckdb-iceberg worktree (DUCKDB_BUILD_DIR=$DUCKDB_BUILD_DIR)?"
+[ -d "$DUCKDB_EXTENSION_REPOSITORY" ] || die "missing DuckDB extension repository: $DUCKDB_EXTENSION_REPOSITORY
+  Did you run 'make debug' in the duckdb-iceberg worktree (DUCKDB_BUILD_DIR=$DUCKDB_BUILD_DIR)?"
 mkdir -p "$ADBC_REPOSITORY"
 ln -sfn "$DUCKDB_DRIVER_LIB" "$ADBC_REPOSITORY/duckdb"
 [ -f "$ADBC_REPOSITORY/duckdb" ] || die "missing local DuckDB ADBC driver link: $ADBC_REPOSITORY/duckdb"
+
+link_cached_snowflake_driver() {
+  local cache_root driver_path driver_link suffix
+  cache_root=${DBT_ADBC_CACHE_ROOT:-$HOME/Library/Caches/com.getdbt/adbc}
+  case "$(uname -s)" in
+    Darwin) suffix=dylib ;;
+    Linux) suffix=so ;;
+    *) return 0 ;;
+  esac
+
+  driver_path=
+  for candidate in "$cache_root"/*/"libadbc_driver_snowflake-$SNOWFLAKE_ADBC_DRIVER_VERSION.$suffix"; do
+    [ -f "$candidate" ] || continue
+    driver_path=$candidate
+    break
+  done
+
+  if [ -z "$driver_path" ]; then
+    printf 'warning: cached Snowflake ADBC driver %s not found under %s\n' "$SNOWFLAKE_ADBC_DRIVER_VERSION" "$cache_root" >&2
+    printf 'warning: run once with DISABLE_CDN_DRIVER_CACHE=false to populate the cache, or set SNOWFLAKE_ADBC_DRIVER_VERSION\n' >&2
+    return 0
+  fi
+
+  driver_link="$ADBC_REPOSITORY/libadbc_driver_snowflake.$suffix"
+  ln -sfn "$driver_path" "$driver_link"
+  [ -f "$driver_link" ] || die "missing Snowflake ADBC driver link: $driver_link"
+}
+
+link_cached_snowflake_driver
 
 require_duckdb_extension() {
   local extension_name=$1
@@ -119,9 +204,18 @@ bootstrap_demo_schemas() {
 }
 
 for existing_env_name in \
+  AWS_ACCESS_KEY_ID \
   AWS_CLOUD_COST_SOURCE_CATALOG \
   AWS_CLOUD_COST_SOURCE_SCHEMA \
   AWS_CLOUD_COST_SOURCE_TABLE \
+  AWS_CLOUD_COST_TARGET_SCHEMA \
+  AWS_DEFAULT_REGION \
+  AWS_REGION \
+  AWS_S3_TABLES_BUCKET_NAME \
+  AWS_S3_TABLES_NAMESPACE \
+  AWS_S3_TABLES_WAREHOUSE \
+  AWS_SECRET_ACCESS_KEY \
+  AWS_SESSION_TOKEN \
   DATABRICKS_CATALOG \
   DATABRICKS_DEFAULT_REGION \
   DATABRICKS_HOST \
@@ -213,9 +307,18 @@ umask 077
   printf 'HORIZON_OAUTH2_SERVER_URI=%s\n' "$(quote_env "$HORIZON_OAUTH2_SERVER_URI")"
   printf 'HORIZON_OAUTH2_SCOPE=%s\n' "$(quote_env "$HORIZON_OAUTH2_SCOPE")"
   printf 'POLARIS_ENV=%s\n' "$(quote_env "$POLARIS_ENV")"
+  write_optional_env AWS_ACCESS_KEY_ID
   write_optional_env AWS_CLOUD_COST_SOURCE_CATALOG
   write_optional_env AWS_CLOUD_COST_SOURCE_SCHEMA
   write_optional_env AWS_CLOUD_COST_SOURCE_TABLE
+  write_optional_env AWS_CLOUD_COST_TARGET_SCHEMA
+  write_optional_env AWS_DEFAULT_REGION
+  write_optional_env AWS_REGION
+  write_optional_env AWS_S3_TABLES_BUCKET_NAME
+  write_optional_env AWS_S3_TABLES_NAMESPACE
+  write_optional_env AWS_S3_TABLES_WAREHOUSE
+  write_optional_env AWS_SECRET_ACCESS_KEY
+  write_optional_env AWS_SESSION_TOKEN
   write_optional_env POLARIS_ACCESS_DELEGATION_MODE
   write_optional_env POLARIS_DEFAULT_REGION
   write_optional_env POLARIS_ID
@@ -254,3 +357,4 @@ printf 'duckdb extension repository: %s\n' "$DUCKDB_EXTENSION_REPOSITORY"
 printf 'snowflake account: %s\n' "$SNOWFLAKE_ACCOUNT"
 printf 'snowflake source: %s.%s.%s\n' "$SNOWFLAKE_DATABASE" "$SNOWFLAKE_SCHEMA" "$SNOWFLAKE_TABLE"
 printf 'horizon endpoint: %s\n' "$HORIZON_ENDPOINT"
+printf '\nnext: run `direnv allow`, then `scripts/generate_local_csv.sh` to create the source CSV.\n'

@@ -2,13 +2,11 @@ version: 2
 
 sources:
   - name: aws_cloud_cost
-    # catalog: "{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}"
-    # schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', 'aws_cloud_cost') }}"
-    database:  polaris
-    schema: aws_cloud_cost
+    database: "{{ env_var('SNOWFLAKE_SOURCE_DATABASE', env_var('SNOWFLAKE_DATABASE', 'DEVELOPMENT')) }}"
+    schema: "{{ env_var('SNOWFLAKE_SOURCE_SCHEMA', env_var('SNOWFLAKE_SCHEMA', 'AWS_CLOUD_COST')) }}"
     tables: &aws_report
       - name: report
-        # identifier: "{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}"
+        identifier: "{{ env_var('SNOWFLAKE_SOURCE_TABLE', env_var('SNOWFLAKE_TABLE', 'AWS_COST_REPORT')) }}"
         description: '{{ doc("aws_cloud_cost_report") }}'
         columns:
           - name: _file

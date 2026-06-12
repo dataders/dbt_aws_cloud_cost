@@ -76,7 +76,7 @@ final as (
         coalesce(pricing_unit, product_pricing_unit) as pricing_unit,
         product_fee_code,
         product_fee_description,
-        coalesce(product_product_name, nullif(regexp_extract(product, '"product_name":"([^"]+)"', 1), '')) as product_name,
+        coalesce(product_product_name, nullif({{ aws_cloud_cost_regex_group('product', '"product_name":"([^"]+)"', 1) }}, '')) as product_name,
         product_product_family as product_family,
         product_servicecode as product_service_code,
         product_instance_type as instance_type,

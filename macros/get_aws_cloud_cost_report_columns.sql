@@ -1,14 +1,16 @@
 {% macro get_aws_cloud_cost_report_columns() %}
 
+{% set timestamp_type = "timestamp_ntz(6)" if target.type == "snowflake" else dbt.type_timestamp() %}
+
 {% set columns = [
     {"name": "_file", "datatype": dbt.type_string()},
-    {"name": "_fivetran_synced", "datatype": dbt.type_timestamp()},
+    {"name": "_fivetran_synced", "datatype": timestamp_type},
     {"name": "_line", "datatype": dbt.type_int()},
-    {"name": "_modified", "datatype": dbt.type_timestamp()},
+    {"name": "_modified", "datatype": timestamp_type},
     {"name": "bill_bill_type", "datatype": dbt.type_string()},
     {"name": "bill_billing_entity", "datatype": dbt.type_string()},
-    {"name": "bill_billing_period_end_date", "datatype": dbt.type_timestamp()},
-    {"name": "bill_billing_period_start_date", "datatype": dbt.type_timestamp()},
+    {"name": "bill_billing_period_end_date", "datatype": timestamp_type},
+    {"name": "bill_billing_period_start_date", "datatype": timestamp_type},
     {"name": "bill_invoice_id", "datatype": dbt.type_int()},
     {"name": "bill_invoicing_entity", "datatype": dbt.type_string()},
     {"name": "bill_payer_account_id", "datatype": dbt.type_int()},
@@ -32,8 +34,8 @@
     {"name": "line_item_usage_account_id", "datatype": dbt.type_int()},
     {"name": "line_item_usage_account_name", "datatype": dbt.type_string()},
     {"name": "line_item_usage_amount", "datatype": dbt.type_float()},
-    {"name": "line_item_usage_end_date", "datatype": dbt.type_timestamp()},
-    {"name": "line_item_usage_start_date", "datatype": dbt.type_timestamp()},
+    {"name": "line_item_usage_end_date", "datatype": timestamp_type},
+    {"name": "line_item_usage_start_date", "datatype": timestamp_type},
     {"name": "line_item_usage_type", "datatype": dbt.type_string()},
     {"name": "pricing_currency", "datatype": dbt.type_string()},
     {"name": "pricing_public_on_demand_cost", "datatype": dbt.type_float()},

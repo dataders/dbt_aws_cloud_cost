@@ -6,13 +6,12 @@ profile: aws_cloud_cost
 
 models:
   aws_cloud_cost:
-    +schema: aws_cloud_cost
     +catalog_name: horizon
+    +schema: aws_cloud_cost
     +materialized: table
 
     staging:
       +materialized: table
-      # +catalog_name: builtin
 
 vars:
   aws_cloud_cost_start_date: "1970-01-01"

@@ -63,6 +63,13 @@ UNITY_SECRET_BLOCK = """      secrets:
           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
 """
 
+S3_TABLES_SECRET_BLOCK = """      secrets:
+        - type: s3
+          name: aws_s3_tables
+          provider: credential_chain
+          region: "{{ env_var('AWS_REGION', env_var('AWS_DEFAULT_REGION', 'us-west-2')) }}"
+"""
+
 
 def load_dotenv(path: Path) -> None:
     if not path.exists():
@@ -98,6 +105,8 @@ def secret_block(catalog: str) -> str | None:
         return HORIZON_CLIENT_SECRET_BLOCK
     if catalog == "unity":
         return UNITY_SECRET_BLOCK
+    if catalog == "s3_tables":
+        return S3_TABLES_SECRET_BLOCK
     return None
 
 
@@ -161,6 +170,8 @@ def render_profile(include_catalogs: list[str]) -> str:
       threads: 4
       settings:
         allow_unsigned_extensions: true
+        extension_directory: "{{ env_var('DUCKDB_EXTENSION_REPOSITORY', './.tmp/duckdb-extension-repository') }}"
+        custom_extension_repository: "{{ env_var('DUCKDB_EXTENSION_REPOSITORY', './.tmp/duckdb-extension-repository') }}"
 """
 
     selected_secrets = [

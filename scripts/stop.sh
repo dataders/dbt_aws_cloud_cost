@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# Counterpart to scripts/start.sh (the optional / legacy Polaris source path).
+# Cleans local ShadowTraffic batch files and, with --drop-table, drops the Polaris
+# source table. Not needed for the default local-CSV demo.
 set -euo pipefail
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-POLARIS_ENV=${POLARIS_ENV:-/Users/dataders/Developer/dotfiles_env/secrets.zsh}
+DOTFILES_ENV=${DOTFILES_ENV:-$HOME/Developer/dotfiles_env}
+POLARIS_ENV=${POLARIS_ENV:-$DOTFILES_ENV/secrets.zsh}
 DROP_TABLE=false
 
 die() {

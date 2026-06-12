@@ -1,10 +1,10 @@
 {{
     config(
         materialized='table',
-        partition_by = {'field': 'usage_start_date', 'data_type': 'date'}
-            if target.type not in ['spark', 'databricks'] else ['usage_start_date'],       
+        partition_by = [] if target.type == 'snowflake' else ['usage_start_date']
+            if target.type in ['spark', 'databricks']
+            else {'field': 'usage_start_date', 'data_type': 'date'},
         cluster_by = ['billing_period_start_date'],
-        unique_key='unique_key'
     )
 }}
 
