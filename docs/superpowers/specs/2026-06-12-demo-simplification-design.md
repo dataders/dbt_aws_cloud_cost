@@ -85,6 +85,32 @@ credential section.
 - Missing Snowflake JSON, ShadowTraffic license, or `dotfiles_env` secrets
   produce **warnings**, and `.env` is written with whatever was found.
 
+### 5b. Environment variable audit + `.env.example`
+
+Goal: a colleague can see, in one committed file, the **minimum** set of
+variables needed — overall and per catalog — and `.env` contains nothing else.
+
+- **Audit:** trace every `env_var()` / `$VAR` reference in `profiles.yml`,
+  `catalogs.yml`, and the kept scripts. Vars not referenced anywhere are
+  dropped from `setup_env.sh`'s `.env` output (the current `.env` carries
+  ~46 vars; legacy quickstart vars like `BIGQUERY_*`/`POSTGRES_*`/
+  `REDSHIFT_*` exist only in files already slated for deletion).
+- **One auth path per catalog:** where multiple credential mechanisms exist
+  (e.g. Horizon PAT vs OAuth client vs pre-minted access token), the demo
+  documents and wires exactly **one**; alternates are removed from `.env`
+  generation. Selection happens during implementation based on which path is
+  verified working.
+- **Committed `.env.example`:** variable names + placeholder values only
+  (never secrets), grouped into sections — "always required" (binaries +
+  derived paths), then one block per external catalog, each block headed by
+  which catalog needs it. `ducklake` requires no credentials.
+- `setup_env.sh` writes `.env` in the same grouped order, filling what it
+  finds and leaving commented placeholders for what's missing, so the file
+  itself shows a colleague what's left to supply.
+- **Test invariant:** the set of env vars referenced by `profiles.yml` +
+  `catalogs.yml` equals the set documented in `.env.example` (pytest check),
+  so the two can't drift.
+
 ### 6. Scripts cleanup
 
 - Delete: `use_catalog.sh`.
@@ -139,7 +165,8 @@ Update invariants:
 With all external env vars unset:
 
 1. `dbt parse`, `dbt seed`, `dbt run` against ducklake — green.
-2. `pytest tests/test_demo_configuration.py` — green.
+2. `pytest tests/test_demo_configuration.py` — green (including the
+   `.env.example` ↔ referenced-env-var parity check).
 3. With docker up: switch to lakekeeper (the two edits) and `dbt run` — green.
 4. README walkthrough sanity check: every command in Quickstart is runnable
    verbatim from a fresh clone (given the two built binaries).
