@@ -1,6 +1,6 @@
 {% macro get_aws_cloud_cost_report_columns() %}
 
-{% set timestamp_type = "timestamp_ntz(6)" if target.type == "snowflake" else dbt.type_timestamp() %}
+{% set timestamp_type = dbt.type_timestamp() %}
 
 {% set columns = [
     {"name": "_file", "datatype": dbt.type_string()},

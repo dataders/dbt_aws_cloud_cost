@@ -7,7 +7,7 @@ with source as (
 fields as (
 
     select
-        '{{ env_var('AWS_CLOUD_COST_SOURCE_CATALOG', 'polaris') }}.{{ env_var('AWS_CLOUD_COST_SOURCE_TABLE', 'aws_cost_report') }}' as source_relation,
+        'seed.aws_cost_report' as source_relation,
         {% for col in get_aws_cloud_cost_report_columns() %}
         try_cast(nullif(cast({{ col.name }} as {{ dbt.type_string() }}), '') as {{ col.datatype }}) as {{ col.name }}{% if not loop.last %},{% endif %}
         {% endfor %}
