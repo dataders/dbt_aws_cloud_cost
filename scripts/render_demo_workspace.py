@@ -9,7 +9,7 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKSPACE = ROOT / ".tmp" / "demo-workspace"
 PROJECT_FILES = ("dbt_project.yml", "packages.yml")
-PROJECT_DIRS = ("models", "macros", "local_files", "dbt_packages")
+PROJECT_DIRS = ("models", "macros", "seeds", "dbt_packages")
 
 LAKEKEEPER_SECRET_BLOCK = """      secrets:
         - type: s3
@@ -111,7 +111,14 @@ def secret_block(catalog: str) -> str | None:
 
 
 def catalog_blocks() -> dict[str, str]:
-    text = (ROOT / "catalogs.yml").read_text()
+    raw = (ROOT / "catalogs.yml").read_text()
+    # Inactive blocks are commented with exactly '# ' per line ('##' = prose).
+    text = "\n".join(
+        line[2:] if line.startswith("# ") and not line.startswith("## ")
+        else ("" if line == "#" else line)
+        for line in raw.splitlines()
+        if not line.startswith("## ") and line != "##"
+    )
     blocks: dict[str, list[str]] = {}
     current_name: str | None = None
     current_lines: list[str] = []
@@ -133,7 +140,7 @@ def catalog_blocks() -> dict[str, str]:
 
 def normalize_catalogs(include_catalogs: list[str]) -> list[str]:
     aliases = {
-        "local": "local_files",
+        "local": "ducklake",
         "builtin": "aws_cloud_cost",
     }
     result: list[str] = []
@@ -145,7 +152,7 @@ def normalize_catalogs(include_catalogs: list[str]) -> list[str]:
             return list(catalog_blocks().keys())
         if normalized not in result:
             result.append(normalized)
-    return result or ["local_files"]
+    return result or ["ducklake"]
 
 
 def render_catalogs(include_catalogs: list[str]) -> str:
