@@ -21,19 +21,24 @@ aws_cloud_cost:
         autoinstall_known_extensions: false
         autoload_known_extensions: false
       secrets:
-        - type: s3
-          name: minio_secret
-          key_id: minio-root-user
-          secret: minio-root-password
-          endpoint: "localhost:19000"
-          url_style: path
-          use_ssl: false
-#         ## horizon (Snowflake) — uncomment with the horizon catalog block.
-#         ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
-#         ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
-#         - type: iceberg
-#           name: snowflake_oauth
-#           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
+        ## horizon (Snowflake) — uncomment with the horizon catalog block.
+        ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
+        ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
+        - type: iceberg
+          name: snowflake_oauth
+          token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
+        ## unity (Databricks; read-write) — uncomment with the unity catalog block
+        - type: iceberg
+          name: databricks_token
+          token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
+        # ## for local lakekeeper
+        # - type: s3
+        #   name: minio_secret
+        #   key_id: minio-root-user
+        #   secret: minio-root-password
+        #   endpoint: "localhost:19000"
+        #   url_style: path
+        #   use_ssl: false
 #         ## polaris — uncomment with the polaris catalog block
 #         - type: iceberg
 #           name: polaris_oauth
@@ -42,10 +47,6 @@ aws_cloud_cost:
 #           oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
 #           oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
 #           oauth2_grant_type: "client_credentials"
-#         ## unity (Databricks; read-write) — uncomment with the unity catalog block
-#         - type: iceberg
-#           name: databricks_token
-#           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
 #         ## s3_tables — uncomment with the s3_tables catalog block
 #         - type: s3
 #           name: aws_s3_tables
