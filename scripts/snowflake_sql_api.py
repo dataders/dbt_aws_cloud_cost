@@ -297,15 +297,16 @@ def horizon_oauth2_server_uri() -> str:
 
 def request_horizon_access_token() -> tuple[str, int | None]:
     scope = os.environ.get("HORIZON_OAUTH2_SCOPE") or "session:role:" + env("SNOWFLAKE_ROLE")
+    # Mint the Horizon access token with a KEY-PAIR JWT as the OAuth client_secret.
+    # A Snowflake PAT authenticates and can READ via the Horizon Iceberg REST
+    # catalog, but createTable/writes 403 ("Authorization failed"). A key-pair JWT
+    # works for both read and write. `client_credentials` is the only grant the
+    # endpoint accepts (jwt-bearer / token-exchange both return unsupported_grant_type).
     form = {
         "grant_type": "client_credentials",
         "scope": scope,
-        "client_secret": os.environ.get("HORIZON_CLIENT_SECRET") or env("HORIZON_PAT"),
+        "client_secret": snowflake_jwt(),
     }
-    client_secret = os.environ.get("HORIZON_CLIENT_SECRET")
-    if client_secret:
-        form["client_id"] = env("HORIZON_CLIENT_ID")
-
     body = urllib.parse.urlencode(form).encode("utf-8")
     request = urllib.request.Request(
         horizon_oauth2_server_uri(),
@@ -344,11 +345,9 @@ def refresh_horizon_token() -> None:
 def horizon_bearer_token() -> str:
     if os.environ.get("SNOWFLAKE_ACCESS_TOKEN"):
         return env("SNOWFLAKE_ACCESS_TOKEN")
-    if os.environ.get("HORIZON_ACCESS_TOKEN") and not (
-        os.environ.get("HORIZON_PAT") or os.environ.get("HORIZON_CLIENT_SECRET")
-    ):
+    if os.environ.get("HORIZON_ACCESS_TOKEN"):
         return env("HORIZON_ACCESS_TOKEN")
-    token, _ = request_horizon_access_token()
+    token, _ = request_horizon_access_token()  # mints a fresh key-pair token
     return token
 
 
@@ -390,9 +389,7 @@ def doctor() -> int:
     print(f"SNOWFLAKE_WAREHOUSE: {printable_value('SNOWFLAKE_WAREHOUSE')}")
     print(f"SNOWFLAKE_ROLE: {printable_value('SNOWFLAKE_ROLE', '<omitted>')}")
     print(f"SNOWFLAKE_PRIVATE_KEY: {configured_status('SNOWFLAKE_PRIVATE_KEY')}")
-    print(f"HORIZON_PAT: {configured_status('HORIZON_PAT')}")
     print(f"HORIZON_ACCESS_TOKEN: {configured_status('HORIZON_ACCESS_TOKEN')}")
-    print(f"HORIZON_CLIENT_SECRET: {configured_status('HORIZON_CLIENT_SECRET')}")
     print(f"HORIZON_OAUTH2_SERVER_URI: {printable_value('HORIZON_OAUTH2_SERVER_URI')}")
     print(f"HORIZON_OAUTH2_SCOPE: {printable_value('HORIZON_OAUTH2_SCOPE')}")
     print(f"HORIZON_EXTERNAL_VOLUME: {printable_value('HORIZON_EXTERNAL_VOLUME', horizon_external_volume())}")
@@ -430,42 +427,6 @@ def doctor() -> int:
     return 1
 
 
-def result_row_dict(result: dict) -> dict[str, str]:
-    rows = result.get("data") or []
-    if not rows:
-        raise SystemExit("Snowflake PAT command returned no rows")
-
-    metadata = result.get("resultSetMetaData") or {}
-    row_type = metadata.get("rowType") or []
-    names = [str(column.get("name", "")).lower() for column in row_type]
-    if not names:
-        raise SystemExit("Snowflake PAT command returned no metadata")
-
-    return dict(zip(names, rows[0]))
-
-
-def create_horizon_pat() -> None:
-    role = env("SNOWFLAKE_ROLE")
-    token_name = f"CODEX_HORIZON_DEMO_{int(time.time())}"
-    statement = (
-        f"ALTER USER ADD PROGRAMMATIC ACCESS TOKEN {quote_ident(token_name)} "
-        f"ROLE_RESTRICTION = '{role.replace("'", "''")}' "
-        "DAYS_TO_EXPIRY = 1 "
-        "COMMENT = 'Short-lived PAT for local dbt DuckDB Horizon catalog demo'"
-    )
-    result = execute_statement(statement, include_context=False)
-    row = result_row_dict(result)
-    token_secret = row.get("token_secret")
-    if not token_secret:
-        raise SystemExit("Snowflake PAT command did not return token_secret")
-
-    scope = f"session:role:{role}"
-    upsert_dotenv(ROOT / ".env", {"HORIZON_PAT": token_secret, "HORIZON_OAUTH2_SCOPE": scope})
-    os.environ["HORIZON_PAT"] = token_secret
-    os.environ["HORIZON_OAUTH2_SCOPE"] = scope
-    print(f"wrote HORIZON_PAT for {token_name} to {ROOT / '.env'}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -473,7 +434,6 @@ def main() -> None:
         choices=[
             "doctor",
             "configure-horizon-schema",
-            "create-horizon-pat",
             "refresh-horizon-token",
         ],
     )
@@ -485,8 +445,6 @@ def main() -> None:
         raise SystemExit(doctor())
     elif args.command == "configure-horizon-schema":
         configure_horizon_schema()
-    elif args.command == "create-horizon-pat":
-        create_horizon_pat()
     elif args.command == "refresh-horizon-token":
         refresh_horizon_token()
 
