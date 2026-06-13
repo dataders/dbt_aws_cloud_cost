@@ -431,42 +431,6 @@ def doctor() -> int:
     return 1
 
 
-def result_row_dict(result: dict) -> dict[str, str]:
-    rows = result.get("data") or []
-    if not rows:
-        raise SystemExit("Snowflake PAT command returned no rows")
-
-    metadata = result.get("resultSetMetaData") or {}
-    row_type = metadata.get("rowType") or []
-    names = [str(column.get("name", "")).lower() for column in row_type]
-    if not names:
-        raise SystemExit("Snowflake PAT command returned no metadata")
-
-    return dict(zip(names, rows[0]))
-
-
-def create_horizon_pat() -> None:
-    role = env("SNOWFLAKE_ROLE")
-    token_name = f"CODEX_HORIZON_DEMO_{int(time.time())}"
-    statement = (
-        f"ALTER USER ADD PROGRAMMATIC ACCESS TOKEN {quote_ident(token_name)} "
-        f"ROLE_RESTRICTION = '{role.replace("'", "''")}' "
-        "DAYS_TO_EXPIRY = 1 "
-        "COMMENT = 'Short-lived PAT for local dbt DuckDB Horizon catalog demo'"
-    )
-    result = execute_statement(statement, include_context=False)
-    row = result_row_dict(result)
-    token_secret = row.get("token_secret")
-    if not token_secret:
-        raise SystemExit("Snowflake PAT command did not return token_secret")
-
-    scope = f"session:role:{role}"
-    upsert_dotenv(ROOT / ".env", {"HORIZON_PAT": token_secret, "HORIZON_OAUTH2_SCOPE": scope})
-    os.environ["HORIZON_PAT"] = token_secret
-    os.environ["HORIZON_OAUTH2_SCOPE"] = scope
-    print(f"wrote HORIZON_PAT for {token_name} to {ROOT / '.env'}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -474,7 +438,6 @@ def main() -> None:
         choices=[
             "doctor",
             "configure-horizon-schema",
-            "create-horizon-pat",
             "refresh-horizon-token",
         ],
     )
@@ -486,8 +449,6 @@ def main() -> None:
         raise SystemExit(doctor())
     elif args.command == "configure-horizon-schema":
         configure_horizon_schema()
-    elif args.command == "create-horizon-pat":
-        create_horizon_pat()
     elif args.command == "refresh-horizon-token":
         refresh_horizon_token()
 

@@ -10,6 +10,36 @@ value. The default path (`ducklake`) runs with **zero credentials**.
 > (see [Build the two local binaries](#build-the-two-local-binaries)), not a
 > `pip`-installed dbt Core.
 
+## Quick start
+
+The default `ducklake` path needs **no credentials**. End to end:
+
+1. **Install prerequisites** — [`uv`](https://docs.astral.sh/uv/), a Rust
+   toolchain (`cargo`), a C++ toolchain (`make`/CMake), and `git`. (`docker` only
+   for the `lakekeeper` catalog.) See [Prerequisites](#prerequisites).
+2. **Build the two local debug binaries** (not published anywhere) and note their
+   paths — the Fusion `dbt` binary and the patched `duckdb-iceberg` driver. This
+   is the step newcomers trip on; follow
+   [Build the two local binaries](#build-the-two-local-binaries) exactly
+   (vcpkg + `DISABLE_SANITIZER=1`).
+3. **Write `.env`** by pointing `setup.sh` at those two paths:
+   ```bash
+   DBT_BIN=/path/to/fs/target/debug/dbt \
+   DUCKDB_BUILD_DIR=/path/to/duckdb-iceberg \
+   scripts/setup.sh
+   source .env                            # or: set -a && source .env && set +a
+   ```
+4. **Run the demo** (builds into the zero-credential `ducklake` catalog):
+   ```bash
+   "$DBT_BIN" seed                        # load the committed seed
+   "$DBT_BIN" run                         # build 5 models into ducklake
+   ```
+5. **Inspect the output** — see [Setup and run](#setup-and-run).
+6. **(optional) Try another catalog** — pick one of `lakekeeper` / `horizon` /
+   `polaris` / `unity`, one at a time, per
+   [Switching catalogs](#switching-catalogs). Verified writing 5/5: ducklake,
+   lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
+
 ## How it works
 
 ```
@@ -38,15 +68,19 @@ aws_cloud_cost__daily_*            (output catalog = +catalog_name in dbt_projec
 | `lakekeeper` | Iceberg REST (local) | ✅ | `docker compose up -d` |
 | `horizon` | Snowflake Horizon (Polaris REST) | ✅ | Snowflake creds (`SNOWFLAKE_*`) |
 | `polaris` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
-| `unity` | Databricks Unity Catalog | 🚫 read-only upstream | n/a (reads only) |
+| `unity` | Databricks Unity Catalog | ✅ | Databricks creds (`DATABRICKS_*`) |
 | `s3_tables` | Amazon S3 Tables | 🧪 experimental | AWS creds |
 
-`unity` is read-only: Unity Catalog's Iceberg REST endpoint implements no
-`createTable`, so external-engine writes get `403`
-([unitycatalog/unitycatalog#3](https://github.com/unitycatalog/unitycatalog/issues/3)).
-`horizon`/`unity` writes also need the write-compat attach options from
+`horizon` and `unity` writes need the write-compat attach options from
 [duckdb/duckdb-iceberg#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017)
-(shipping in DuckDB 1.5.4) — the locally built driver includes them.
+(shipping in DuckDB 1.5.4) — the locally built driver includes them, and the
+`catalogs.yml` blocks set `read_only: false` (+ `disable_multi_table_commit`).
+`horizon` additionally requires **key-pair auth** (a PAT can read but not write)
+and an **uppercase** target schema (`CATALOG_SCHEMA=AWS_CLOUD_COST`) — see
+[External-catalog credentials](#external-catalog-credentials). This is
+**proprietary Databricks** Unity Catalog; OSS `unitycatalog/unitycatalog` is a
+separate target tracked in
+[#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).
 
 ## Prerequisites
 
@@ -180,7 +214,11 @@ secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
     `SNOWFLAKE_DEFAULT_REGION` to that volume's region (`us-east-1`) — not
     `SNOWFLAKE_MANAGED` (its internal storage can't be written by an external engine).
 - **polaris** — set the `POLARIS_*` vars.
-- **unity** (read-only) — set `DATABRICKS_*`; reads work, writes return `403`.
+- **unity** (Databricks) — set `DATABRICKS_*`; reads **and writes** work. The
+  `catalogs.yml` block sets `read_only: false` + `disable_multi_table_commit`
+  (without them, `createTable` 403s — which is what made it look read-only).
+  Databricks UC accepts either schema case. (OSS Unity Catalog is a separate
+  target — see [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).)
 - **s3_tables** (experimental) — set `AWS_S3_TABLES_*`; auth uses the standard
   AWS credential chain (configure your AWS SSO/profile).
 
