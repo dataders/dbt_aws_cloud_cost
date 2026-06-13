@@ -46,7 +46,8 @@ catalogs:
 #         secret: snowflake_oauth
 #         authorization_type: "OAUTH2"
 #         access_delegation_mode: "VENDED_CREDENTIALS"
-#         default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-west-2') }}"
+#         ## must match the external volume's region (FUSION_ADAPTERS_CI_TEMP = us-east-1)
+#         default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-east-1') }}"
 #         stage_create_tables: false
 #         disable_multi_table_commit: true
 #         skip_create_table_metadata_updates: true
@@ -79,6 +80,11 @@ catalogs:
 #         authorization_type: "OAUTH2"
 #         access_delegation_mode: "VENDED_CREDENTIALS"
 #         default_region: "{{ env_var('DATABRICKS_DEFAULT_REGION', 'us-west-2') }}"
+#         ## Databricks UC supports external-engine writes with these options
+#         ## (verified createTable+insert). Without read_only:false it 403s —
+#         ## which is what made it look "read-only" before.
+#         disable_multi_table_commit: true
+#         read_only: false
 #         attach_as: "unity"
 #         default_schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"
 

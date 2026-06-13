@@ -28,14 +28,12 @@ aws_cloud_cost:
           endpoint: "localhost:19000"
           url_style: path
           use_ssl: false
-#         ## horizon (Snowflake) — uncomment with the horizon catalog block
+#         ## horizon (Snowflake) — uncomment with the horizon catalog block.
+#         ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
+#         ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
 #         - type: iceberg
 #           name: snowflake_oauth
-#           client_id: ""
-#           client_secret: "{{ env_var('HORIZON_PAT', '') }}"
-#           oauth2_server_uri: "{{ env_var('HORIZON_OAUTH2_SERVER_URI', '') or ((env_var('HORIZON_ENDPOINT', 'https://example.snowflakecomputing.com/polaris/api/catalog')) ~ '/v1/oauth/tokens') }}"
-#           oauth2_scope: "{{ env_var('HORIZON_OAUTH2_SCOPE', 'session:role:ACCOUNTADMIN') }}"
-#           oauth2_grant_type: "client_credentials"
+#           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
 #         ## polaris — uncomment with the polaris catalog block
 #         - type: iceberg
 #           name: polaris_oauth

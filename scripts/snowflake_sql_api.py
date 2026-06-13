@@ -297,15 +297,16 @@ def horizon_oauth2_server_uri() -> str:
 
 def request_horizon_access_token() -> tuple[str, int | None]:
     scope = os.environ.get("HORIZON_OAUTH2_SCOPE") or "session:role:" + env("SNOWFLAKE_ROLE")
+    # Mint the Horizon access token with a KEY-PAIR JWT as the OAuth client_secret.
+    # A Snowflake PAT authenticates and can READ via the Horizon Iceberg REST
+    # catalog, but createTable/writes 403 ("Authorization failed"). A key-pair JWT
+    # works for both read and write. `client_credentials` is the only grant the
+    # endpoint accepts (jwt-bearer / token-exchange both return unsupported_grant_type).
     form = {
         "grant_type": "client_credentials",
         "scope": scope,
-        "client_secret": os.environ.get("HORIZON_CLIENT_SECRET") or env("HORIZON_PAT"),
+        "client_secret": snowflake_jwt(),
     }
-    client_secret = os.environ.get("HORIZON_CLIENT_SECRET")
-    if client_secret:
-        form["client_id"] = env("HORIZON_CLIENT_ID")
-
     body = urllib.parse.urlencode(form).encode("utf-8")
     request = urllib.request.Request(
         horizon_oauth2_server_uri(),

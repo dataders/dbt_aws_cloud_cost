@@ -160,13 +160,25 @@ secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
 
 - **lakekeeper** — no credentials; `docker compose up -d` (lakekeeper + minio +
   postgres), then run. Teardown with `docker compose down -v`.
-- **horizon** (Snowflake) — set the `SNOWFLAKE_*` key-pair vars, then mint a
-  short-lived PAT and configure the Snowflake schema:
+- **horizon** (Snowflake) — set the `SNOWFLAKE_*` key-pair vars, then:
   ```bash
-  scripts/create_horizon_pat.sh        # writes HORIZON_PAT to .env (1-day expiry)
-  scripts/configure_horizon_schema.sh  # sets CATALOG=SNOWFLAKE + external volume
+  scripts/configure_horizon_schema.sh  # one-time: schema CATALOG=SNOWFLAKE + writable external volume
+  scripts/refresh_horizon_token.sh     # mints a KEY-PAIR access token -> HORIZON_ACCESS_TOKEN (~55 min)
   scripts/doctor.sh                    # checks SQL-API + Horizon connectivity
   ```
+  Two non-obvious requirements for external-engine **writes** to Horizon (both
+  needed — see `memory` / commit notes):
+  - **Key-pair auth, not a PAT.** A Snowflake PAT can *read* via the Horizon
+    Iceberg REST catalog but `createTable` 403s. `refresh_horizon_token.sh` mints
+    a key-pair JWT access token; the profile uses it as a bearer token. Re-run it
+    if the token expires.
+  - **Uppercase, writable external volume.** The REST namespace is
+    case-sensitive on write, so the target schema must be `AWS_CLOUD_COST`
+    (set `CATALOG_SCHEMA=AWS_CLOUD_COST` — keep `+schema: aws_cloud_cost` so the
+    `generate_schema_name` macro substitutes it). Use a real S3 external volume
+    with `ALLOW_WRITES=TRUE` (e.g. `FUSION_ADAPTERS_CI_TEMP`) and set
+    `SNOWFLAKE_DEFAULT_REGION` to that volume's region (`us-east-1`) — not
+    `SNOWFLAKE_MANAGED` (its internal storage can't be written by an external engine).
 - **polaris** — set the `POLARIS_*` vars.
 - **unity** (read-only) — set `DATABRICKS_*`; reads work, writes return `403`.
 - **s3_tables** (experimental) — set `AWS_S3_TABLES_*`; auth uses the standard
