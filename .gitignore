@@ -59,6 +59,7 @@ wheels/
 # Secrets and credentials
 .env
 .env.*
+!.env.example
 .user.yml
 .secrets
 credentials.json
@@ -69,6 +70,7 @@ service-account.json
 .cache/
 *.temp
 *.tmp
+metadata/
 
 # Virtual environments
 .conda/

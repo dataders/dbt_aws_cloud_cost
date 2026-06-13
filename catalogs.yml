@@ -1,69 +1,93 @@
+## dbt catalogs (v2) for the multi-catalog demo.
+##
+## RULES:
+##   1. Fusion ATTACHES EVERY catalog defined in this file at every dbt
+##      invocation. Keep exactly ONE output catalog uncommented.
+##   2. The active catalog's `name` must match `+catalog_name` in
+##      dbt_project.yml.
+##   3. To switch catalogs, comment the active block and uncomment another
+##      (strip the leading `# ` from each line; prose comments use `##`).
+##   4. Credentialed catalogs also need their secret block uncommented in
+##      profiles.yml (same `# ` convention) and the env vars from
+##      .env.example. See README "Switching catalogs".
+
 catalogs:
-  # - name: local_files
-  #   type: local_filesystem
-  #   table_format: default
-  #   config:
-  #     duckdb:
-  #       root_path: "./local_files"
-  #       file_format: csv
-
-  # - name: polaris
-  #   type: iceberg_rest
-  #   table_format: iceberg
-  #   config:
-  #     duckdb:
-  #       endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
-  #       warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
-  #       secret: polaris_oauth
-  #       authorization_type: "OAUTH2"
-  #       access_delegation_mode: "VENDED_CREDENTIALS"
-  #       default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
-  #       attach_as: "polaris"
-  #       default_schema: "{{ env_var('AWS_CLOUD_COST_SOURCE_SCHEMA', env_var('POLARIS_NAMESPACE', 'aws_cloud_cost')) }}"
-
-  # - name: ducklake
-  #   type: ducklake
-  #   table_format: default
-  #   config:
-  #     duckdb:
-  #       metadata_path: "./.tmp/ducklake.db"
-  #       attach_as: "ducklake"
-  #       create_if_not_exists: true
-
-  - name: lakekeeper
-    type: iceberg_rest
-    table_format: iceberg
+  - name: ducklake
+    type: ducklake
+    table_format: default
     config:
       duckdb:
-        endpoint: "http://localhost:18181/catalog"
-        warehouse: "demo"
-        authorization_type: "NONE"
-        access_delegation_mode: "NONE"
-        attach_as: "lakekeeper"
-        default_schema: "default"
+        metadata_path: "./.tmp/ducklake.db"
+        attach_as: "ducklake"
+        create_if_not_exists: true
 
-  - name: horizon
-    type: horizon
-    table_format: iceberg
-    config:
-      duckdb:
-        endpoint: "{{ env_var('SNOWFLAKE_CATALOG_URI', '') or env_var('HORIZON_ENDPOINT', 'https://example.snowflakecomputing.com/polaris/api/catalog') }}"
-        warehouse: "{{ env_var('HORIZON_WAREHOUSE', '') or env_var('SNOWFLAKE_CATALOG_WAREHOUSE', '') or env_var('SNOWFLAKE_DATABASE', 'DEVELOPMENT') }}"
-        secret: snowflake_oauth
-        default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-west-2') }}"
-        attach_as: "horizon"
-        default_schema: "{{ env_var('HORIZON_SCHEMA', '') or env_var('SNOWFLAKE_SCHEMA', 'AWS_CLOUD_COST') }}"
+#   - name: lakekeeper
+#     type: iceberg_rest
+#     table_format: iceberg
+#     config:
+#       duckdb:
+#         endpoint: "http://localhost:18181/catalog"
+#         warehouse: "demo"
+#         authorization_type: "NONE"
+#         access_delegation_mode: "NONE"
+#         attach_as: "lakekeeper"
+#         default_schema: "default"
 
-  - name: unity
-    type: iceberg_rest
-    table_format: iceberg
-    config:
-      duckdb:
-        endpoint: "{{ env_var('DATABRICKS_HOST', 'https://example.cloud.databricks.com') }}/api/2.1/unity-catalog/iceberg-rest"
-        warehouse: "{{ env_var('DATABRICKS_CATALOG', 'dbt_dataders') }}"
-        secret: databricks_token
-        authorization_type: "OAUTH2"
-        access_delegation_mode: "VENDED_CREDENTIALS"
-        default_region: "{{ env_var('DATABRICKS_DEFAULT_REGION', 'us-west-2') }}"
-        attach_as: "unity"
-        default_schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"
+#   - name: horizon
+#     type: horizon
+#     table_format: iceberg
+#     config:
+#       snowflake:
+#         external_volume: "{{ env_var('SNOWFLAKE_EXTERNAL_VOLUME', 'FUSION_ADAPTERS_CI_TEMP') }}"
+#         base_location_root: "{{ env_var('SNOWFLAKE_BASE_LOCATION_ROOT', 'dbt_aws_cloud_cost/horizon') }}"
+#       duckdb:
+#         endpoint: "{{ env_var('HORIZON_ENDPOINT', 'https://example.snowflakecomputing.com/polaris/api/catalog') }}"
+#         warehouse: "{{ env_var('HORIZON_WAREHOUSE', 'DEVELOPMENT') }}"
+#         secret: snowflake_oauth
+#         authorization_type: "OAUTH2"
+#         access_delegation_mode: "VENDED_CREDENTIALS"
+#         default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-west-2') }}"
+#         stage_create_tables: false
+#         disable_multi_table_commit: true
+#         skip_create_table_metadata_updates: true
+#         remove_files_on_delete: false
+#         attach_as: "horizon"
+#         default_schema: "{{ env_var('HORIZON_SCHEMA', 'AWS_CLOUD_COST') }}"
+
+#   - name: polaris
+#     type: iceberg_rest
+#     table_format: iceberg
+#     config:
+#       duckdb:
+#         endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
+#         warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
+#         secret: polaris_oauth
+#         authorization_type: "OAUTH2"
+#         access_delegation_mode: "VENDED_CREDENTIALS"
+#         default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
+#         attach_as: "polaris"
+#         default_schema: "aws_cloud_cost"
+
+#   - name: unity
+#     type: iceberg_rest
+#     table_format: iceberg
+#     config:
+#       duckdb:
+#         endpoint: "{{ env_var('DATABRICKS_HOST', 'https://example.cloud.databricks.com') }}/api/2.1/unity-catalog/iceberg-rest"
+#         warehouse: "{{ env_var('DATABRICKS_CATALOG', 'main') }}"
+#         secret: databricks_token
+#         authorization_type: "OAUTH2"
+#         access_delegation_mode: "VENDED_CREDENTIALS"
+#         default_region: "{{ env_var('DATABRICKS_DEFAULT_REGION', 'us-west-2') }}"
+#         attach_as: "unity"
+#         default_schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"
+
+#   - name: s3_tables
+#     type: s3_tables
+#     table_format: iceberg
+#     config:
+#       duckdb:
+#         warehouse: "{{ env_var('AWS_S3_TABLES_WAREHOUSE', '') }}"
+#         secret: aws_s3_tables
+#         attach_as: "s3_tables"
+#         default_schema: "{{ env_var('AWS_S3_TABLES_NAMESPACE', 'cloud_cost') }}"
