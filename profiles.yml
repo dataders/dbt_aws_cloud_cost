@@ -9,7 +9,7 @@ aws_cloud_cost:
   outputs:
     catalog_demo:
       type: duckdb
-      path: "aws_cloud_cost_demo.duckdb"
+      path: "data/aws_cloud_cost_demo.duckdb"
       schema: aws_cloud_cost
       threads: 4
       settings:
@@ -42,7 +42,7 @@ aws_cloud_cost:
 #           oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
 #           oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
 #           oauth2_grant_type: "client_credentials"
-#         ## unity (read-only upstream) — uncomment with the unity catalog block
+#         ## unity (Databricks; read-write) — uncomment with the unity catalog block
 #         - type: iceberg
 #           name: databricks_token
 #           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
