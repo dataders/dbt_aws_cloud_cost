@@ -84,11 +84,30 @@ use wherever you checked the repos out).
 
    Then set `DBT_BIN=/path/to/your/fs/target/debug/dbt`.
 
-2. **Patched `duckdb-iceberg` debug build** — from a `duckdb-iceberg` checkout:
+2. **Patched `duckdb-iceberg` debug build** — from a `duckdb-iceberg` checkout.
+
+   This build has two non-obvious requirements. Get either wrong and `dbt run`
+   fails in confusing ways (`Unhandled options found`, unsigned-extension
+   errors, or `AddressSanitizer ... loaded too late`). Both are necessary:
+
+   **a. vcpkg** (the `avro`/`httpfs` extensions resolve their C deps through it).
+   You need a **full** (non-shallow) vcpkg clone at the commit pinned in
+   `duckdb-iceberg/vcpkg.json` (`builtin-baseline`) — a shallow clone fails on
+   the version-pinned `openssl`/`aws-c-http` ports:
 
    ```bash
-   cd /path/to/your/duckdb-iceberg   # e.g. ~/Developer/duckdb-iceberg
-   make debug                        # builds build/debug/{duckdb, src/libduckdb.dylib, repository}
+   git clone https://github.com/microsoft/vcpkg.git ~/Developer/vcpkg
+   cd ~/Developer/vcpkg && git checkout <builtin-baseline from vcpkg.json> && ./bootstrap-vcpkg.sh
+   export VCPKG_TOOLCHAIN_PATH="$HOME/Developer/vcpkg/scripts/buildsystems/vcpkg.cmake"
+   ```
+
+   **b. Build debug WITHOUT sanitizers.** A stock `make debug` enables
+   AddressSanitizer, and an ASAN-instrumented `libduckdb.dylib` cannot be
+   `dlopen`'d by the (non-ASAN) `dbt` binary. Always pass `DISABLE_SANITIZER=1`:
+
+   ```bash
+   cd /path/to/your/duckdb-iceberg          # e.g. ~/Developer/duckdb-iceberg
+   DISABLE_SANITIZER=1 make debug           # builds build/debug/{duckdb, src/libduckdb.dylib, repository}
    ```
 
    Then set `DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg`. `setup_env.sh`
@@ -97,9 +116,14 @@ use wherever you checked the repos out).
    `build/debug/repository`) — each is individually overridable via
    `DUCKDB_CLI`, `DUCKDB_DRIVER_LIB`, and `DUCKDB_EXTENSION_REPOSITORY`.
 
-The patched DuckDB build ships the `httpfs` and `iceberg` extensions as
-built-ins, which is why the profile loads the local (unsigned) driver instead of
-the CDN driver.
+This build ships `httpfs`, `iceberg`, and `ducklake` as **statically-linked
+built-ins**. `setup_env.sh` symlinks the driver into `.tmp/adbc-lib/` as
+`libduckdb.<dylib|so>` — the exact name dbt-fusion's loader resolves for the
+DuckDB backend. If that link is missing or misnamed, dbt silently falls back to
+a system/Homebrew `libduckdb` (stock DuckDB without the write-compat
+Iceberg/DuckLake extensions) and catalog writes fail. The profile sets
+`autoinstall_known_extensions: false` / `autoload_known_extensions: false` so
+DuckDB uses these built-ins rather than fetching official extensions.
 
 ## One-time setup
 

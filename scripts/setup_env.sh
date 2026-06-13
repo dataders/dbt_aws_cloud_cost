@@ -137,8 +137,19 @@ DUCKDB_EXTENSION_REPOSITORY=${DUCKDB_EXTENSION_REPOSITORY:-$DUCKDB_BUILD_DIR/bui
 [ -d "$DUCKDB_EXTENSION_REPOSITORY" ] || die "missing DuckDB extension repository: $DUCKDB_EXTENSION_REPOSITORY
   Did you run 'make debug' in the duckdb-iceberg worktree (DUCKDB_BUILD_DIR=$DUCKDB_BUILD_DIR)?"
 mkdir -p "$ADBC_REPOSITORY"
-ln -sfn "$DUCKDB_DRIVER_LIB" "$ADBC_REPOSITORY/duckdb"
-[ -f "$ADBC_REPOSITORY/duckdb" ] || die "missing local DuckDB ADBC driver link: $ADBC_REPOSITORY/duckdb"
+# dbt-fusion's xdbc loader resolves the DuckDB backend via load_from_name("duckdb"),
+# which searches ADBC_REPOSITORY (then /opt/homebrew/lib) for `libduckdb.<suffix>`.
+# The link MUST use that exact name. If it is named anything else (e.g. "duckdb"),
+# dbt silently falls through to a system/Homebrew libduckdb -- stock DuckDB without
+# this repo's locally built write-compat Iceberg/DuckLake extensions -- and catalog
+# writes fail with "Unhandled options found" / unsigned-extension errors.
+case "$(uname -s)" in
+  Linux) duckdb_driver_suffix=so ;;
+  *) duckdb_driver_suffix=dylib ;;
+esac
+duckdb_driver_link="$ADBC_REPOSITORY/libduckdb.$duckdb_driver_suffix"
+ln -sfn "$DUCKDB_DRIVER_LIB" "$duckdb_driver_link"
+[ -f "$duckdb_driver_link" ] || die "missing local DuckDB ADBC driver link: $duckdb_driver_link"
 
 link_cached_snowflake_driver() {
   local cache_root driver_path driver_link suffix
@@ -352,7 +363,7 @@ bootstrap_demo_schemas
 printf 'wrote %s\n' "$ROOT/.env"
 printf 'dbt binary: %s\n' "$FS_DBT_BIN"
 printf 'duckdb cli: %s\n' "$DUCKDB_CLI"
-printf 'duckdb adbc driver: %s\n' "$ADBC_REPOSITORY/duckdb"
+printf 'duckdb adbc driver: %s\n' "$duckdb_driver_link"
 printf 'duckdb extension repository: %s\n' "$DUCKDB_EXTENSION_REPOSITORY"
 printf 'snowflake account: %s\n' "$SNOWFLAKE_ACCOUNT"
 printf 'snowflake source: %s.%s.%s\n' "$SNOWFLAKE_DATABASE" "$SNOWFLAKE_SCHEMA" "$SNOWFLAKE_TABLE"
