@@ -345,11 +345,9 @@ def refresh_horizon_token() -> None:
 def horizon_bearer_token() -> str:
     if os.environ.get("SNOWFLAKE_ACCESS_TOKEN"):
         return env("SNOWFLAKE_ACCESS_TOKEN")
-    if os.environ.get("HORIZON_ACCESS_TOKEN") and not (
-        os.environ.get("HORIZON_PAT") or os.environ.get("HORIZON_CLIENT_SECRET")
-    ):
+    if os.environ.get("HORIZON_ACCESS_TOKEN"):
         return env("HORIZON_ACCESS_TOKEN")
-    token, _ = request_horizon_access_token()
+    token, _ = request_horizon_access_token()  # mints a fresh key-pair token
     return token
 
 
@@ -391,9 +389,7 @@ def doctor() -> int:
     print(f"SNOWFLAKE_WAREHOUSE: {printable_value('SNOWFLAKE_WAREHOUSE')}")
     print(f"SNOWFLAKE_ROLE: {printable_value('SNOWFLAKE_ROLE', '<omitted>')}")
     print(f"SNOWFLAKE_PRIVATE_KEY: {configured_status('SNOWFLAKE_PRIVATE_KEY')}")
-    print(f"HORIZON_PAT: {configured_status('HORIZON_PAT')}")
     print(f"HORIZON_ACCESS_TOKEN: {configured_status('HORIZON_ACCESS_TOKEN')}")
-    print(f"HORIZON_CLIENT_SECRET: {configured_status('HORIZON_CLIENT_SECRET')}")
     print(f"HORIZON_OAUTH2_SERVER_URI: {printable_value('HORIZON_OAUTH2_SERVER_URI')}")
     print(f"HORIZON_OAUTH2_SCOPE: {printable_value('HORIZON_OAUTH2_SCOPE')}")
     print(f"HORIZON_EXTERNAL_VOLUME: {printable_value('HORIZON_EXTERNAL_VOLUME', horizon_external_volume())}")

@@ -228,9 +228,9 @@ The seed is committed (`seeds/aws_cost_report.csv`), so you normally never touch
 it. The ShadowTraffic generator that originally produced it has been removed from
 this repo; reintroduce a generator separately if you need fresh data.
 
-## Optional diagnostics
+## Diagnostics
 
-- `scripts/direct_duckdb_catalog_probe.sh` — raw-DuckDB attach probe (bypasses dbt).
+- `scripts/doctor.sh` — checks SQL-API auth + Horizon catalog connectivity.
 
 ## Troubleshooting
 
