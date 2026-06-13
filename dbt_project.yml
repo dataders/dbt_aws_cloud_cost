@@ -8,10 +8,12 @@ models:
   aws_cloud_cost:
     ## Must match the single uncommented catalog in catalogs.yml.
     ## Valid names: ducklake | lakekeeper | horizon | polaris | unity | s3_tables
-    +catalog_name: horizon
-    staging:
-      +catalog_name: ducklake
+    +catalog_name: ducklake
+    +schema: aws_cloud_cost
     +materialized: table
+
+    staging:
+      +materialized: table
 
 seeds:
   aws_cloud_cost:

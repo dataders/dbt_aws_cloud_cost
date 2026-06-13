@@ -24,13 +24,13 @@ aws_cloud_cost:
         ## horizon (Snowflake) — uncomment with the horizon catalog block.
         ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
         ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
-        - type: iceberg
-          name: snowflake_oauth
-          token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
+#         - type: iceberg
+#           name: snowflake_oauth
+#           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
         ## unity (Databricks; read-write) — uncomment with the unity catalog block
-        - type: iceberg
-          name: databricks_token
-          token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
+#         - type: iceberg
+#           name: databricks_token
+#           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
         # ## for local lakekeeper
         # - type: s3
         #   name: minio_secret

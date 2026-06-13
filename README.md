@@ -69,7 +69,7 @@ aws_cloud_cost__daily_*            (output catalog = +catalog_name in dbt_projec
 | `horizon` | Snowflake Horizon (Polaris REST) | ✅ | Snowflake creds (`SNOWFLAKE_*`) |
 | `polaris` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
 | `unity` | Databricks Unity Catalog | ✅ | Databricks creds (`DATABRICKS_*`) |
-| `s3_tables` | Amazon S3 Tables | 🧪 experimental | AWS creds |
+| `s3_tables` | Amazon S3 Tables | 🧪 driver-only (adapter pending [fs#10806](https://github.com/dbt-labs/fs/pull/10806)) | AWS creds |
 
 `horizon` and `unity` writes need the write-compat attach options from
 [duckdb/duckdb-iceberg#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017)
@@ -165,7 +165,7 @@ Inspect the result (any DuckLake-1.0-capable DuckDB):
 
 ```bash
 "$DUCKDB_CLI" :memory: -c \
-  "ATTACH 'ducklake:./.tmp/ducklake.db' AS dl;
+  "ATTACH 'ducklake:./data/ducklake.db' AS dl;
    SELECT * FROM dl.aws_cloud_cost.aws_cloud_cost__daily_overview LIMIT 5;"
 ```
 
@@ -220,7 +220,13 @@ secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
   Databricks UC accepts either schema case. (OSS Unity Catalog is a separate
   target — see [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).)
 - **s3_tables** (experimental) — set `AWS_S3_TABLES_*`; auth uses the standard
-  AWS credential chain (configure your AWS SSO/profile).
+  AWS credential chain (configure your AWS SSO/profile). **The Fusion adapter does
+  not accept `type: s3_tables` yet** — support is pending
+  [fs#10806](https://github.com/dbt-labs/fs/pull/10806). The underlying driver
+  already works (`ATTACH '<bucket-arn>' (TYPE iceberg, ENDPOINT_TYPE 's3_tables')`),
+  and writes benchmark as the fastest of the remote catalogs (~1.8s/table, vs
+  Unity ~5.5s, Horizon ~12s). Note: live AWS creds and the local `lakekeeper`
+  (minio) target can't be active in the same run.
 
 ## Regenerating the seed
 
@@ -246,4 +252,7 @@ this repo; reintroduce a generator separately if you need fresh data.
   `ducklake` path needs none).
 - **lakekeeper hangs / can't attach** — confirm `docker compose up -d` is healthy
   at `http://localhost:18181`.
-- **Unity writes fail (`403`)** — expected; Unity's Iceberg REST is read-only.
+- **Unity writes fail (`403`)** — the unity `catalogs.yml` block is missing
+  `read_only: false` / `disable_multi_table_commit: true`. Unity writes *do* work
+  with both set; without them `createTable` 403s (which originally looked like
+  read-only).
