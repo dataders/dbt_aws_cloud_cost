@@ -13,57 +13,12 @@ import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_TEMPLATE = ROOT / "shadowtraffic" / "config.json"
-RENDERED_CONFIG = ROOT / ".tmp" / "shadowtraffic-config.json"
 
-
-SOURCE_COLUMNS = {
-    "_file": "VARCHAR",
-    "_line": "INTEGER",
-    "_fivetran_synced": "TIMESTAMP_NTZ",
-    "_modified": "TIMESTAMP_NTZ",
-    "bill_bill_type": "VARCHAR",
-    "bill_billing_period_start_date": "TIMESTAMP_NTZ",
-    "bill_billing_period_end_date": "TIMESTAMP_NTZ",
-    "bill_payer_account_id": "INTEGER",
-    "bill_payer_account_name": "VARCHAR",
-    "identity_line_item_id": "VARCHAR",
-    "line_item_line_item_description": "VARCHAR",
-    "line_item_line_item_type": "VARCHAR",
-    "line_item_blended_cost": "FLOAT",
-    "line_item_blended_rate": "FLOAT",
-    "line_item_currency_code": "VARCHAR",
-    "line_item_normalization_factor": "FLOAT",
-    "line_item_normalized_usage_amount": "FLOAT",
-    "line_item_operation": "VARCHAR",
-    "line_item_product_code": "VARCHAR",
-    "line_item_unblended_cost": "FLOAT",
-    "line_item_unblended_rate": "FLOAT",
-    "line_item_usage_account_id": "INTEGER",
-    "line_item_usage_account_name": "VARCHAR",
-    "line_item_usage_amount": "FLOAT",
-    "line_item_usage_start_date": "TIMESTAMP_NTZ",
-    "line_item_usage_end_date": "TIMESTAMP_NTZ",
-    "line_item_usage_type": "VARCHAR",
-    "pricing_public_on_demand_cost": "FLOAT",
-    "pricing_public_on_demand_rate": "FLOAT",
-    "pricing_purchase_option": "VARCHAR",
-    "pricing_term": "VARCHAR",
-    "pricing_unit": "VARCHAR",
-    "product_product_name": "VARCHAR",
-    "product_product_family": "VARCHAR",
-    "product_servicecode": "VARCHAR",
-    "product_instance_type": "VARCHAR",
-    "product_instance_family": "VARCHAR",
-    "product_location": "VARCHAR",
-    "product_location_type": "VARCHAR",
-    "product_region_code": "VARCHAR",
-}
 
 
 def load_dotenv(path: Path) -> None:
     if not path.exists():
-        raise SystemExit(f"missing {path}; run scripts/setup_env.sh first")
+        raise SystemExit(f"missing {path}; run scripts/setup.sh first")
 
     explicit_overrides = {
         name.strip()
@@ -227,13 +182,6 @@ def quote_ident(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def source_relation() -> str:
-    return ".".join(
-        quote_ident(part)
-        for part in [env("SNOWFLAKE_DATABASE"), env("SNOWFLAKE_SCHEMA"), env("SNOWFLAKE_TABLE")]
-    )
-
-
 def horizon_database_name() -> str:
     return os.environ.get("HORIZON_WAREHOUSE") or env("SNOWFLAKE_DATABASE")
 
@@ -252,32 +200,6 @@ def horizon_external_volume() -> str:
         or os.environ.get("SNOWFLAKE_EXTERNAL_VOLUME")
         or "SNOWFLAKE_MANAGED"
     )
-
-
-def create_source_sql() -> str:
-    columns = ",\n    ".join(
-        f"{quote_ident(column)} {data_type}" for column, data_type in SOURCE_COLUMNS.items()
-    )
-    return f"CREATE TABLE IF NOT EXISTS {source_relation()} (\n    {columns}\n)"
-
-
-def setup_source() -> None:
-    execute_statement(f"CREATE SCHEMA IF NOT EXISTS {quote_ident(env('SNOWFLAKE_DATABASE'))}.{quote_ident(env('SNOWFLAKE_SCHEMA'))}")
-    execute_statement(create_source_sql())
-    execute_statement(f"TRUNCATE TABLE {source_relation()}")
-    print(f"ready: {source_relation()}")
-
-
-def drop_source() -> None:
-    execute_statement(f"DROP TABLE IF EXISTS {source_relation()}")
-    print(f"dropped: {source_relation()}")
-
-
-def count_rows() -> None:
-    result = execute_statement(f"SELECT COUNT(*) AS row_count FROM {source_relation()}")
-    data = result.get("data") or []
-    rows = data[0][0] if data and data[0] else "0"
-    print(f"{source_relation()} rows: {rows}")
 
 
 def configured_status(name: str) -> str:
@@ -544,38 +466,11 @@ def create_horizon_pat() -> None:
     print(f"wrote HORIZON_PAT for {token_name} to {ROOT / '.env'}")
 
 
-def render_shadowtraffic_config() -> None:
-    config = CONFIG_TEMPLATE.read_text()
-    replacements = {
-        "__SNOWFLAKE_JWT__": snowflake_jwt(),
-        "__SNOWFLAKE_SQL_API_HOST__": env("SNOWFLAKE_SQL_API_HOST"),
-        "__SNOWFLAKE_DATABASE__": env("SNOWFLAKE_DATABASE"),
-        "__SNOWFLAKE_SCHEMA__": env("SNOWFLAKE_SCHEMA"),
-        "__SNOWFLAKE_WAREHOUSE__": env("SNOWFLAKE_WAREHOUSE"),
-        "__SNOWFLAKE_ROLE__": os.environ.get("SNOWFLAKE_ROLE", ""),
-        "AWS_CLOUD_COST.AWS_COST_REPORT": f"{env('SNOWFLAKE_DATABASE')}.{env('SNOWFLAKE_SCHEMA')}.{env('SNOWFLAKE_TABLE')}",
-    }
-    for old, new in replacements.items():
-        config = config.replace(old, new)
-    parsed = json.loads(config)
-    if not os.environ.get("SNOWFLAKE_ROLE"):
-        parsed["generators"][0]["data"].pop("role", None)
-
-    RENDERED_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    RENDERED_CONFIG.write_text(json.dumps(parsed, indent=2) + "\n")
-    RENDERED_CONFIG.chmod(0o600)
-    print(RENDERED_CONFIG)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
         choices=[
-            "setup-source",
-            "drop-source",
-            "count",
-            "render-shadowtraffic-config",
             "doctor",
             "configure-horizon-schema",
             "create-horizon-pat",
@@ -586,15 +481,7 @@ def main() -> None:
 
     load_dotenv(ROOT / ".env")
 
-    if args.command == "setup-source":
-        setup_source()
-    elif args.command == "drop-source":
-        drop_source()
-    elif args.command == "count":
-        count_rows()
-    elif args.command == "render-shadowtraffic-config":
-        render_shadowtraffic_config()
-    elif args.command == "doctor":
+    if args.command == "doctor":
         raise SystemExit(doctor())
     elif args.command == "configure-horizon-schema":
         configure_horizon_schema()

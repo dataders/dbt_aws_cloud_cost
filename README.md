@@ -1,79 +1,69 @@
 # dbt multi-catalog demo (AWS cloud cost on DuckDB)
 
-A clone-and-run dbt project that shows the same models being written to
-**different output catalogs** using dbt's catalogs v2. The transformation is a
-small AWS Cost & Usage Report pipeline; the interesting part is that you can
-point the final models at any of several Iceberg / lakehouse catalogs by
-flipping one env var.
+A clone-and-run dbt project that shows the **same models written to different
+output catalogs** using dbt's catalogs v2. The transformation is a small AWS
+Cost & Usage Report pipeline; the interesting part is that you can point the
+models at any of several Iceberg / lakehouse catalogs by changing one config
+value. The default path (`ducklake`) runs with **zero credentials**.
 
-> Throughout this README, "dbt" refers to the locally built Fusion `dbt` binary
+> Throughout, "dbt" means the locally built Fusion `dbt` binary
 > (see [Build the two local binaries](#build-the-two-local-binaries)), not a
 > `pip`-installed dbt Core.
 
 ## How it works
 
 ```
-local_files/aws_cost_report.csv         (read with read_csv)
+seeds/aws_cost_report.csv          (committed sample data; `dbt seed` loads it
+        |                           into the built-in DuckDB catalog)
+        v
+stg_aws_cloud_cost__report_base
+stg_aws_cloud_cost__report
         |
         v
-stg_aws_cloud_cost__report_base         (built-in DuckDB catalog)
-        |
-        v
-stg_aws_cloud_cost__report              (built-in DuckDB catalog)
-        |
-        v
-aws_cloud_cost__daily_*                 (output catalog = +catalog_name in dbt_project.yml)
+aws_cloud_cost__daily_*            (output catalog = +catalog_name in dbt_project.yml)
 ```
 
-- The **source** is a local CSV read directly via `read_csv()`. There is no large
-  external source catalog to attach, so existence checks stay fast.
-- **Staging** models materialize in the built-in DuckDB catalog.
-- The **final** models are written to the output catalog named by `+catalog_name`
-  in `dbt_project.yml` (currently `horizon`). `scripts/use_catalog.sh <name>`
-  rewrites `catalogs.yml` to define that catalog (plus the CSV source); the name
-  you pass must match `+catalog_name`. To switch catalogs, edit `+catalog_name`
-  and regenerate `catalogs.yml` for the same name.
+- The **source** is a committed seed (`seeds/aws_cost_report.csv`), loaded by
+  `dbt seed`. No external source catalog to attach, so the demo runs offline.
+- The models build into the **output catalog** named by `+catalog_name` in
+  `dbt_project.yml`. Switching catalogs = pick a different `+catalog_name` and
+  uncomment the matching block in `catalogs.yml` (see
+  [Switching catalogs](#switching-catalogs)).
 
 ### Output catalogs
 
-| Catalog      | Type                         | Write? | Setup |
-| ------------ | ---------------------------- | ------ | ----- |
-| `ducklake`   | DuckLake local metadata      | yes    | none (fastest path) |
-| `lakekeeper` | Iceberg REST (local)         | yes    | `docker compose up -d` |
-| `horizon`    | Snowflake Horizon / Polaris REST | yes | Snowflake env vars (see below) |
-| `unity`      | Databricks Unity Catalog     | yes    | Databricks env vars (see below) |
-| `s3_tables`  | Amazon S3 Tables REST        | experimental | AWS credentials + table bucket |
+| Catalog | Type | Status | Needs |
+| --- | --- | --- | --- |
+| `ducklake` | DuckLake (local metadata) | ✅ default | nothing |
+| `lakekeeper` | Iceberg REST (local) | ✅ | `docker compose up -d` |
+| `horizon` | Snowflake Horizon (Polaris REST) | ✅ | Snowflake creds (`SNOWFLAKE_*`) |
+| `polaris` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
+| `unity` | Databricks Unity Catalog | 🚫 read-only upstream | n/a (reads only) |
+| `s3_tables` | Amazon S3 Tables | 🧪 experimental | AWS creds |
 
-**`unity` and `horizon` writes need the write-compat attach options** from
+`unity` is read-only: Unity Catalog's Iceberg REST endpoint implements no
+`createTable`, so external-engine writes get `403`
+([unitycatalog/unitycatalog#3](https://github.com/unitycatalog/unitycatalog/issues/3)).
+`horizon`/`unity` writes also need the write-compat attach options from
 [duckdb/duckdb-iceberg#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017)
-(shipping with DuckDB 1.5.4). The locally built binaries this repo uses include
-them, and `scripts/use_catalog.sh` renders the right options per catalog (e.g.
-`disable_multi_table_commit` for Unity). On older official extension builds the
-write fails partway (Unity returns HTTP 400 on the data upload; Horizon rejects
-the create), so reads work everywhere but treat writes as requiring 1.5.4+.
-
-`polaris` is also defined in `catalogs.yml` but is no longer the demo's source —
-it was replaced by the local CSV. The optional `scripts/start.sh` / `stop.sh`
-still stream into a Polaris source table if you want a live-appended source.
+(shipping in DuckDB 1.5.4) — the locally built driver includes them.
 
 ## Prerequisites
 
 - macOS or Linux
-- `docker` (for the local lakekeeper stack and the ShadowTraffic generator)
-- [`uv`](https://docs.astral.sh/uv/) for the helper Python scripts
-- `jq`, `curl`, `zsh`
-- A Rust toolchain (`cargo`) and a C++ build toolchain (`make`, CMake) to build
-  the two local binaries below
-- Credentials for any external catalog you want to exercise (Snowflake for
-  `horizon`; see [Credentials](#credentials)). The local `ducklake` and
-  `lakekeeper` paths need no external accounts.
+- A Rust toolchain (`cargo`) and a C++ toolchain (`make`, CMake) to build the
+  two local binaries below; plus `git` for the vcpkg checkout
+- `docker` — only for the `lakekeeper` catalog
+- [`uv`](https://docs.astral.sh/uv/) — only for the optional Snowflake helper
+  scripts (`scripts/*.sh`)
+- Credentials only for whichever external catalog you want to exercise. The
+  default `ducklake` path needs none.
 
 ## Build the two local binaries
 
 This demo depends on two locally built debug binaries that are **not** published
-anywhere — this is the prerequisite a newcomer is most likely to trip on. Build
-both, then point the env vars at them (the absolute paths below are examples;
-use wherever you checked the repos out).
+anywhere — the prerequisite a newcomer is most likely to trip on. The absolute
+paths below are examples; use wherever you checked the repos out.
 
 1. **Custom Fusion `dbt` binary** — from an `fs` checkout/worktree:
 
@@ -85,13 +75,12 @@ use wherever you checked the repos out).
    Then set `DBT_BIN=/path/to/your/fs/target/debug/dbt`.
 
 2. **Patched `duckdb-iceberg` debug build** — from a `duckdb-iceberg` checkout.
+   Two non-obvious requirements; get either wrong and `dbt run` fails in
+   confusing ways (`Unhandled options found`, unsigned-extension errors, or
+   `AddressSanitizer ... loaded too late`):
 
-   This build has two non-obvious requirements. Get either wrong and `dbt run`
-   fails in confusing ways (`Unhandled options found`, unsigned-extension
-   errors, or `AddressSanitizer ... loaded too late`). Both are necessary:
-
-   **a. vcpkg** (the `avro`/`httpfs` extensions resolve their C deps through it).
-   You need a **full** (non-shallow) vcpkg clone at the commit pinned in
+   **a. vcpkg.** The `avro`/`httpfs` extensions resolve C deps through it. Use a
+   **full (non-shallow)** vcpkg clone at the commit pinned in
    `duckdb-iceberg/vcpkg.json` (`builtin-baseline`) — a shallow clone fails on
    the version-pinned `openssl`/`aws-c-http` ports:
 
@@ -101,162 +90,110 @@ use wherever you checked the repos out).
    export VCPKG_TOOLCHAIN_PATH="$HOME/Developer/vcpkg/scripts/buildsystems/vcpkg.cmake"
    ```
 
-   **b. Build debug WITHOUT sanitizers.** A stock `make debug` enables
-   AddressSanitizer, and an ASAN-instrumented `libduckdb.dylib` cannot be
-   `dlopen`'d by the (non-ASAN) `dbt` binary. Always pass `DISABLE_SANITIZER=1`:
+   **b. Build WITHOUT sanitizers.** A stock `make debug` enables AddressSanitizer,
+   and an ASAN `libduckdb.dylib` cannot be `dlopen`'d by the (non-ASAN) `dbt`
+   binary. Always pass `DISABLE_SANITIZER=1`:
 
    ```bash
-   cd /path/to/your/duckdb-iceberg          # e.g. ~/Developer/duckdb-iceberg
-   DISABLE_SANITIZER=1 make debug           # builds build/debug/{duckdb, src/libduckdb.dylib, repository}
+   cd /path/to/your/duckdb-iceberg
+   DISABLE_SANITIZER=1 make debug     # builds build/debug/{duckdb, src/libduckdb.dylib, repository}
    ```
 
-   Then set `DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg`. `setup_env.sh`
-   derives the CLI, driver library, and extension repository paths from it
-   (`build/debug/duckdb`, `build/debug/src/libduckdb.dylib`,
-   `build/debug/repository`) — each is individually overridable via
-   `DUCKDB_CLI`, `DUCKDB_DRIVER_LIB`, and `DUCKDB_EXTENSION_REPOSITORY`.
+   Then set `DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg`.
 
 This build ships `httpfs`, `iceberg`, and `ducklake` as **statically-linked
-built-ins**. `setup_env.sh` symlinks the driver into `.tmp/adbc-lib/` as
-`libduckdb.<dylib|so>` — the exact name dbt-fusion's loader resolves for the
-DuckDB backend. If that link is missing or misnamed, dbt silently falls back to
-a system/Homebrew `libduckdb` (stock DuckDB without the write-compat
-Iceberg/DuckLake extensions) and catalog writes fail. The profile sets
-`autoinstall_known_extensions: false` / `autoload_known_extensions: false` so
-DuckDB uses these built-ins rather than fetching official extensions.
+built-ins**. dbt loads the driver from `ADBC_REPOSITORY`, which points straight
+at `build/debug/src` (that dir already contains `libduckdb.dylib`). The profile
+sets `autoinstall_known_extensions: false` / `autoload_known_extensions: false`
+so DuckDB uses those built-ins instead of fetching official extensions — without
+that, dbt would load a stock DuckDB and catalog writes would fail.
 
-## One-time setup
+## Setup and run
 
-From the repo root:
+From the repo root, point at your two binaries and let `setup.sh` write `.env`:
 
 ```bash
-export DBT_BIN=/path/to/your/fs/target/debug/dbt
-export DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg
+DBT_BIN=/path/to/your/fs/target/debug/dbt \
+DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg \
+scripts/setup.sh
 
-scripts/setup_env.sh        # writes ./.env (see Credentials below)
-direnv allow                # loads .env and puts DBT_BIN/DUCKDB_CLI on PATH
+set -a && source .env && set +a        # load it (or: direnv allow)
+
+"$DBT_BIN" seed                        # load the committed seed (built-in catalog)
+"$DBT_BIN" run                         # build the models into the ducklake catalog
 ```
 
-`scripts/setup_env.sh` validates the two binaries, links the DuckDB ADBC driver
-into `.tmp/adbc-lib`, bootstraps the local schemas, and writes `.env`. It records
-`DBT_BIN` and `DUCKDB_BUILD_DIR`, so on later runs you only need to re-export them
-if they change. `.env` is git-ignored and may contain live secrets — never commit
-it or copy its values elsewhere.
+`setup.sh` validates the binaries and writes a credential-free `.env` (it won't
+overwrite an existing one). Prefer to fill it in by hand? Copy `.env.example` to
+`.env` and edit the two paths instead — `setup.sh` is just a convenience.
 
-Then generate the source data and start the local catalog infra:
+Inspect the result (any DuckLake-1.0-capable DuckDB):
 
 ```bash
-docker compose up -d                 # lakekeeper + minio + postgres (only needed for the lakekeeper target)
-scripts/generate_local_csv.sh 10000  # writes local_files/aws_cost_report.csv
+"$DUCKDB_CLI" :memory: -c \
+  "ATTACH 'ducklake:./.tmp/ducklake.db' AS dl;
+   SELECT * FROM dl.aws_cloud_cost.aws_cloud_cost__daily_overview LIMIT 5;"
 ```
 
-`scripts/generate_local_csv.sh [ROWS]` runs ShadowTraffic to generate rows, then
-writes them to `local_files/aws_cost_report.csv` with a single uniform `_modified`
-timestamp (so every row counts as the latest file version, mirroring one file
-export). It needs `docker`, `uv`, a ShadowTraffic license, and the DuckDB CLI.
+## Switching catalogs
 
-## Credentials
+The active catalog is pinned in two places that **must agree**: `+catalog_name`
+in `dbt_project.yml`, and the single uncommented block in `catalogs.yml` (Fusion
+attaches every catalog in that file, so exactly one stays active). To switch,
+e.g. to `lakekeeper`:
 
-`scripts/setup_env.sh` reads secrets from a private `dotfiles_env` checkout, which
-defaults to `~/Developer/dotfiles_env`. **No secret values are stored in this
-repo** — you supply your own. Point the script at your files with these env vars
-(all optional; defaults assume the maintainer's layout):
+1. In `catalogs.yml`: comment the current block and uncomment the `lakekeeper`
+   one (strip the leading `# ` from each line).
+2. In `dbt_project.yml`: set `+catalog_name: lakekeeper`.
+3. For a credentialed catalog only: also uncomment its secret block in
+   `profiles.yml` and supply its env vars (see below), then re-`source .env`.
+4. `"$DBT_BIN" run`.
 
-| Env var | What it is | Default |
-| --- | --- | --- |
-| `DOTFILES_ENV` | Root of your private secrets checkout | `~/Developer/dotfiles_env` |
-| `SNOWFLAKE_CREDENTIALS_JSON` | JSON with Snowflake account/user/key | `$DOTFILES_ENV/credentials/fusion.env.json` |
-| `SHADOWTRAFFIC_LICENSE_ENV` | ShadowTraffic license env file | `$DOTFILES_ENV/shadowtraffic/license.env` |
-| `POLARIS_ENV` | Shell file exporting `POLARIS_*` / `DATABRICKS_*` / `AWS_CLOUD_COST_*` secrets | `$DOTFILES_ENV/secrets.zsh` |
+`uv run pytest tests/test_demo_configuration.py` enforces the one-active-catalog
+== `+catalog_name` invariant.
 
-If you only want the local `ducklake` / `lakekeeper` targets you still need the
-ShadowTraffic license (to generate the CSV) and a Snowflake credentials JSON
-(setup_env.sh requires it to build `.env`), but you can ignore the
-external-catalog secrets.
+## External-catalog credentials
 
-### External-catalog env vars
+For any non-default catalog, copy the matching section from `.env.example` into
+`.env`, fill it in, then uncomment that catalog's block in `catalogs.yml` and its
+secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
 
-These names are read from `.env` / your environment; supply your own values.
+- **lakekeeper** — no credentials; `docker compose up -d` (lakekeeper + minio +
+  postgres), then run. Teardown with `docker compose down -v`.
+- **horizon** (Snowflake) — set the `SNOWFLAKE_*` key-pair vars, then mint a
+  short-lived PAT and configure the Snowflake schema:
+  ```bash
+  scripts/create_horizon_pat.sh        # writes HORIZON_PAT to .env (1-day expiry)
+  scripts/configure_horizon_schema.sh  # sets CATALOG=SNOWFLAKE + external volume
+  scripts/doctor.sh                    # checks SQL-API + Horizon connectivity
+  ```
+- **polaris** — set the `POLARIS_*` vars.
+- **unity** (read-only) — set `DATABRICKS_*`; reads work, writes return `403`.
+- **s3_tables** (experimental) — set `AWS_S3_TABLES_*`; auth uses the standard
+  AWS credential chain (configure your AWS SSO/profile).
 
-Snowflake Horizon — provide the Snowflake SQL API values (account, user, private
-key, role, warehouse) via `SNOWFLAKE_CREDENTIALS_JSON`, then optionally run
-`scripts/configure_horizon_schema.sh`, `scripts/create_horizon_pat.sh`, and
-`scripts/doctor.sh`. Override the derived REST endpoint with `SNOWFLAKE_CATALOG_URI`
-if needed.
+## Regenerating the seed
 
-Amazon S3 Tables (experimental):
+The seed is committed (`seeds/aws_cost_report.csv`), so you normally never touch
+it. The ShadowTraffic generator that originally produced it has been removed from
+this repo; reintroduce a generator separately if you need fresh data.
 
-```bash
-export AWS_REGION=us-west-2
-export AWS_S3_TABLES_WAREHOUSE='arn:aws:s3tables:<region>:<account>:bucket/<bucket>'
-export AWS_S3_TABLES_NAMESPACE=cloud_cost      # cannot start with the reserved "aws" prefix
-export AWS_CLOUD_COST_TARGET_SCHEMA=cloud_cost
-```
+## Optional diagnostics
 
-Databricks Unity Catalog:
-
-```bash
-export DATABRICKS_HOST='https://<workspace>.cloud.databricks.com'
-export DATABRICKS_TOKEN='<personal-access-token>'
-export DATABRICKS_CATALOG='<your-managed-catalog>'
-export DATABRICKS_SCHEMA='aws_cloud_cost'
-```
-
-## Run and switch catalogs
-
-The active output catalog is set by `+catalog_name` in `dbt_project.yml` (default
-`horizon`). To run against it, generate a matching `catalogs.yml` then run:
-
-```bash
-# horizon — Snowflake-managed Iceberg (matches the default +catalog_name)
-scripts/use_catalog.sh horizon && dbt run
-```
-
-To target a different catalog, set `+catalog_name` in `dbt_project.yml` to that
-name and generate the matching `catalogs.yml`:
-
-```bash
-# ducklake — local DuckLake metadata, fastest, no infra
-# (set +catalog_name: ducklake in dbt_project.yml first)
-scripts/use_catalog.sh ducklake && dbt run
-
-# lakekeeper — local Iceberg REST (needs `docker compose up -d`)
-# (set +catalog_name: lakekeeper in dbt_project.yml first)
-scripts/use_catalog.sh lakekeeper && dbt run
-```
-
-Use `scripts/use_catalog.sh all` to render every catalog into `catalogs.yml` (for
-inspection), but for a `dbt run` always scope to a single catalog so dbt does not
-attach and enumerate an unused external one.
-
-After a run, inspect `aws_cloud_cost__daily_overview` in the active catalog to
-confirm the aggregations are populated.
-
-## Teardown
-
-```bash
-docker compose down -v               # stop and wipe the local lakekeeper stack
-```
-
-The local outputs (`.tmp/`, DuckDB/DuckLake files) are git-ignored. If you used
-the optional Polaris streaming source, `scripts/stop.sh [--drop-table]` cleans
-those batch files (and drops the Polaris table with `--drop-table`).
+- `scripts/direct_duckdb_catalog_probe.sh` — raw-DuckDB attach probe (bypasses dbt).
 
 ## Troubleshooting
 
-- **`setup_env.sh` says `DBT_BIN`/`DUCKDB_BUILD_DIR` is not set** — you have not
-  built and exported the two local binaries; see
-  [Build the two local binaries](#build-the-two-local-binaries).
-- **`missing ... credentials json` / `license env`** — point the
-  `SNOWFLAKE_CREDENTIALS_JSON` / `SHADOWTRAFFIC_LICENSE_ENV` / `DOTFILES_ENV` env
-  vars at your own files (see [Credentials](#credentials)).
-- **`dbt` not found after setup** — run `direnv allow`; `.envrc` puts the
-  `DBT_BIN` and `DUCKDB_CLI` directories on `PATH`.
-- **lakekeeper target hangs or fails to attach** — confirm `docker compose up -d`
-  is healthy and reachable at `http://localhost:18181`.
-- **Unity writes fail with HTTP 400 on the data upload** — your `iceberg`
-  extension build predates the write-compat attach options
-  (duckdb/duckdb-iceberg#1017); rebuild the local binaries or use DuckDB ≥ 1.5.4.
-- **`scripts/doctor.sh`** checks the Snowflake SQL API connectivity for the
-  `horizon` path.
-```
+- **`Unhandled options found` / unsigned-extension errors on a run** — dbt loaded
+  a stock DuckDB instead of your local build. Confirm `ADBC_REPOSITORY` points at
+  your `duckdb-iceberg/build/debug/src` and that `DISABLE_CDN_DRIVER_CACHE=true`.
+- **`AddressSanitizer ... loaded too late`** — rebuild duckdb-iceberg with
+  `DISABLE_SANITIZER=1 make debug`.
+- **catalog name mismatch** — `+catalog_name` in `dbt_project.yml` must equal the
+  single uncommented catalog in `catalogs.yml` (the pytest invariant checks this).
+- **OAuth errors on a local run** — you uncommented a secret block in
+  `profiles.yml` without supplying its credentials; re-comment it (the default
+  `ducklake` path needs none).
+- **lakekeeper hangs / can't attach** — confirm `docker compose up -d` is healthy
+  at `http://localhost:18181`.
+- **Unity writes fail (`403`)** — expected; Unity's Iceberg REST is read-only.

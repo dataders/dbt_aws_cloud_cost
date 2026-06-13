@@ -59,6 +59,7 @@ wheels/
 # Secrets and credentials
 .env
 .env.*
+!.env.example
 .user.yml
 .secrets
 credentials.json

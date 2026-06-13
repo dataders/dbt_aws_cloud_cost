@@ -5,9 +5,8 @@
 ##      invocation. Keep exactly ONE output catalog uncommented.
 ##   2. The active catalog's `name` must match `+catalog_name` in
 ##      dbt_project.yml.
-##   3. Inactive blocks are prefixed with exactly `# ` per line (prose
-##      comments use `##`) — scripts/render_demo_workspace.py and the tests
-##      rely on this convention to un-comment blocks mechanically.
+##   3. To switch catalogs, comment the active block and uncomment another
+##      (strip the leading `# ` from each line; prose comments use `##`).
 ##   4. Credentialed catalogs also need their secret block uncommented in
 ##      profiles.yml (same `# ` convention) and the env vars from
 ##      .env.example. See README "Switching catalogs".
