@@ -8,4 +8,4 @@ command -v uv >/dev/null 2>&1 || {
   exit 1
 }
 
-uv run --with cryptography python "$ROOT/scripts/snowflake_sql_api.py" configure-horizon-schema
+uv run "$ROOT/scripts/snowflake_sql_api.py" configure-horizon-schema
