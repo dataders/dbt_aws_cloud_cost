@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "cryptography",
+# ]
+# ///
 from __future__ import annotations
 
 import argparse

@@ -182,7 +182,7 @@ e.g. to `lakekeeper`:
    `profiles.yml` and supply its env vars (see below), then re-`source .env`.
 4. `"$DBT_BIN" run`.
 
-`uv run pytest tests/test_demo_configuration.py` enforces the one-active-catalog
+`uv run tests/test_demo_configuration.py` enforces the one-active-catalog
 == `+catalog_name` invariant.
 
 ## External-catalog credentials
