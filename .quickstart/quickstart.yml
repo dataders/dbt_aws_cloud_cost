@@ -10,9 +10,9 @@ destination_configurations:
         search_order: [ 'spark_utils', 'dbt_utils' ]
 
 public_models: [
-  "aws_cloud_cost__daily_overview",
-  "aws_cloud_cost__daily_product_report",
-  "aws_cloud_cost__daily_instance_report"
+  "daily_overview",
+  "daily_product_report",
+  "daily_instance_report"
 ]
 
 supported_vars:
@@ -24,6 +24,6 @@ supported_vars:
 
   aws_cloud_cost_report_pass_through_columns:
     type: dictionary
-    description: "Additional Cost & Usage Report columns to include in `aws_cloud_cost__daily_overview`"
+    description: "Additional Cost & Usage Report columns to include in `daily_overview`"
     display_name: "Additional Cost & Usage Report Columns"
 

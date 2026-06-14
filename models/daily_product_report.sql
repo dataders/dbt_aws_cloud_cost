@@ -7,7 +7,7 @@
 with base as (
 
     select *
-    from {{ ref('aws_cloud_cost__daily_overview') }}
+    from {{ ref('daily_overview') }}
 ),
 
 fields as (
@@ -23,12 +23,13 @@ fields as (
         bill_payer_account_id,
         bill_payer_account_name,
         currency_code,
-        usage_type,
+        product_code,
+        product_name,
 
         {# Possible future feature: add variable to persist passthrough columns from daily_overview in this model #}
 
-        count(distinct product_service_code) as count_products,
         count(distinct region_code) as count_regions,
+        count(distinct usage_type) as count_instances,
         sum(coalesce(usage_amount, 0)) as usage_amount,
         sum(coalesce(normalized_usage_amount, 0)) as normalized_usage_amount,
         sum(coalesce(total_reserved_units, 0)) as total_reserved_units, -- use this for size-flexible Reserved Instances
@@ -41,16 +42,16 @@ fields as (
             - bill_type: Anniversary vs Purchase vs Refund
             - purchase_option: pay All Upfront, Partial Upfront, None Upfront
         #}
-        
+
     from base 
-    {{ dbt_utils.group_by(n=11) }}
+    {{ dbt_utils.group_by(n=12) }}
 ),
 
 final as (
 
     select
         *,
-        {# Grain is connector - report - account - usage day - billing month - currency - EC2 type #}
+        {# Grain is connector - report - account - usage day - billing month - currency - AWS product #}
         {{ dbt_utils.generate_surrogate_key([
             'source_relation',
             'report',
@@ -62,7 +63,8 @@ final as (
             'bill_payer_account_id',
             'bill_payer_account_name',
             'currency_code',
-            'usage_type'
+            'product_code',
+            'product_name'
         ]) }} as unique_key
     from fields
 )

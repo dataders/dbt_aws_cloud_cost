@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: aws_cloud_cost__daily_overview
+  - name: daily_overview
     description: >
       Aggregation of the [Standard](https://docs.aws.amazon.com/cur/latest/userguide/dataexports-create-standard.html) Cost & Usage Report (2.0) exported from AWS.
       Includes commonly analyzed dimensions and all metrics used by this DuckDB multi-catalog demo.
@@ -225,7 +225,7 @@ models:
       - name: count_line_items
         description: Count of distinct line items.
 
-  - name: aws_cloud_cost__daily_product_report
+  - name: daily_product_report
     description: >
       Daily view of product usage + accrued costs for each account's billing period.
     columns:
@@ -295,7 +295,7 @@ models:
       - name: total_reserved_units
         description: '{{ doc("reservation_total_reserved_units") }}'
 
-  - name: aws_cloud_cost__daily_instance_report
+  - name: daily_instance_report
     description: Daily view of usage and cost metrics across your different Amazone Elastic Compute Cloud (EC2) instances. 
     columns:
       - name: unique_key
