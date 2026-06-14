@@ -105,17 +105,34 @@ This demo depends on two locally built debug binaries that are **not** published
 anywhere — the prerequisite a newcomer is most likely to trip on. The absolute
 paths below are examples; use wherever you checked the repos out.
 
-1. **Custom Fusion `dbt` binary** — from an `fs` checkout/worktree:
+1. **Custom Fusion `dbt` binary** — from an `fs` checkout that includes the
+   **catalogs v2 read-write** work. That is the Fusion side of
+   [dbt-core#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml
+   v2 part 2 — Horizon & Unity read-write", stacked on part 1
+   [#15238](https://github.com/dbt-labs/dbt-core/pull/15238)), mirrored internally
+   as `dbt-labs/fs#10950`. Until it lands on `fs` `main`, build from that branch:
 
    ```bash
-   cd /path/to/your/fs            # e.g. ~/Developer/fs
+   cd /path/to/your/fs            # e.g. ~/Developer/fs, on the catalogs-v2 branch
    cargo build --bin dbt          # produces target/debug/dbt
    ```
 
    Then set `DBT_BIN=/path/to/your/fs/target/debug/dbt`.
 
-2. **Patched `duckdb-iceberg` debug build** — from a `duckdb-iceberg` checkout.
-   Two non-obvious requirements; get either wrong and `dbt run` fails in
+2. **`duckdb-iceberg` debug build** — from the **`v1.5-variegata` branch** of
+   [`duckdb/duckdb-iceberg`](https://github.com/duckdb/duckdb-iceberg/tree/v1.5-variegata),
+   the DuckDB 1.5.4 line. It carries duckdb-iceberg
+   [#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017) /
+   [#1018](https://github.com/duckdb/duckdb-iceberg/pull/1018) /
+   [#1020](https://github.com/duckdb/duckdb-iceberg/pull/1020) — the write-compat
+   options the v2 Horizon/Unity catalogs need, which aren't in a stable DuckDB
+   release yet. A plain `main`/release checkout will not work.
+
+   ```bash
+   git clone -b v1.5-variegata https://github.com/duckdb/duckdb-iceberg.git
+   ```
+
+   Two more non-obvious requirements; get either wrong and `dbt run` fails in
    confusing ways (`Unhandled options found`, unsigned-extension errors, or
    `AddressSanitizer ... loaded too late`):
 
