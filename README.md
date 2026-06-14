@@ -46,11 +46,10 @@ The default `ducklake` path needs **no credentials**. End to end:
 seeds/aws_cost_report.csv          (committed sample data; `dbt seed` loads it
         |                           into the built-in DuckDB catalog)
         v
-stg_aws_cloud_cost__report_base
-stg_aws_cloud_cost__report
+stg_report                         (reads the seed directly)
         |
         v
-aws_cloud_cost__daily_*            (output catalog = +catalog_name in dbt_project.yml)
+daily_*                            (output catalog = +catalog_name in dbt_project.yml)
 ```
 
 - The **source** is a committed seed (`seeds/aws_cost_report.csv`), loaded by
@@ -166,7 +165,7 @@ Inspect the result (any DuckLake-1.0-capable DuckDB):
 ```bash
 "$DUCKDB_CLI" :memory: -c \
   "ATTACH 'ducklake:./data/ducklake.db' AS dl;
-   SELECT * FROM dl.aws_cloud_cost.aws_cloud_cost__daily_overview LIMIT 5;"
+   SELECT * FROM dl.aws_cloud_cost.daily_overview LIMIT 5;"
 ```
 
 ## Switching catalogs

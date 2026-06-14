@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: stg_aws_cloud_cost__report
+  - name: stg_report
     description: '{{ doc("aws_cloud_cost_report") }}'
     columns:
       - name: source_relation

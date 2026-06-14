@@ -53,6 +53,7 @@ class DemoConfigurationTest(unittest.TestCase):
             "shadowtraffic",
             "local_files",
             "models/staging/src_aws_cloud_cost.yml",
+            "models/staging/base/stg_aws_cloud_cost__report_base.sql",
         ]:
             with self.subTest(removed=gone):
                 self.assertFalse((ROOT / gone).exists(), f"should have been removed: {gone}")
@@ -115,11 +116,10 @@ class DemoConfigurationTest(unittest.TestCase):
         )
 
     def test_staging_reads_from_the_seed(self):
-        base = self.read("models/staging/base/stg_aws_cloud_cost__report_base.sql")
-        staging = self.read("models/staging/stg_aws_cloud_cost__report.sql")
-        self.assertIn("ref('aws_cost_report')", base, "base staging must read the committed seed")
-        self.assertNotIn("read_csv", base)
-        self.assertNotIn("source(", base)
+        staging = self.read("models/staging/stg_report.sql")
+        self.assertIn("ref('aws_cost_report')", staging, "staging must read the committed seed")
+        self.assertNotIn("read_csv", staging)
+        self.assertNotIn("source(", staging)
         self.assertNotIn("env_var", staging)
         self.assertNotIn(" over (", staging.lower(), "staging must avoid window functions")
 
@@ -131,7 +131,7 @@ class DemoConfigurationTest(unittest.TestCase):
             "dbt seed",
             "+catalog_name",
             "docker compose up",
-            "aws_cloud_cost__daily_overview",
+            "daily_overview",
         ]:
             with self.subTest(present=snippet):
                 self.assertIn(snippet, readme)

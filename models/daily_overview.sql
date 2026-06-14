@@ -7,7 +7,7 @@
 with source_report as (
 
     select *
-    from {{ ref('stg_aws_cloud_cost__report') }}
+    from {{ ref('stg_report') }}
 ),
 
 {# Sometimes records are sent with just IDs and null names. The following 2 CTEs will map account names

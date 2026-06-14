@@ -31,14 +31,14 @@ aws_cloud_cost:
 #         - type: iceberg
 #           name: databricks_token
 #           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
-        # ## for local lakekeeper
-        # - type: s3
-        #   name: minio_secret
-        #   key_id: minio-root-user
-        #   secret: minio-root-password
-        #   endpoint: "localhost:19000"
-        #   url_style: path
-        #   use_ssl: false
+        ## for local lakekeeper
+        - type: s3
+          name: minio_secret
+          key_id: minio-root-user
+          secret: minio-root-password
+          endpoint: "localhost:19000"
+          url_style: path
+          use_ssl: false
 #         ## polaris — uncomment with the polaris catalog block
 #         - type: iceberg
 #           name: polaris_oauth
