@@ -42,6 +42,13 @@ The default `ducklake` path needs **no credentials**. End to end:
 
 ## How it works
 
+![How catalogs.yml definitions map to catalogs and route the dbt DAG by catalog](docs/catalog-routing.png)
+
+Each model picks its output catalog with `+catalog_name`, which dbt resolves to a
+block in `catalogs.yml`. Staging stays in the built-in DuckDB catalog; final models
+can fan out to external catalogs (DuckLake / Horizon / Unity / …). The pipeline at a
+glance:
+
 ```
 seeds/aws_cost_report.csv          (committed sample data; `dbt seed` loads it
         |                           into the built-in DuckDB catalog)
