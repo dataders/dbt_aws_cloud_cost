@@ -10,36 +10,6 @@ value. The default path (`ducklake`) runs with **zero credentials**.
 > (see [Build the two local binaries](#build-the-two-local-binaries)), not a
 > `pip`-installed dbt Core.
 
-## Quick start
-
-The default `ducklake` path needs **no credentials**. End to end:
-
-1. **Install prerequisites** — [`uv`](https://docs.astral.sh/uv/), a Rust
-   toolchain (`cargo`), a C++ toolchain (`make`/CMake), and `git`. (`docker` only
-   for the `lakekeeper` catalog.) See [Prerequisites](#prerequisites).
-2. **Build the two local debug binaries** (not published anywhere) and note their
-   paths — the Fusion `dbt` binary and the patched `duckdb-iceberg` driver. This
-   is the step newcomers trip on; follow
-   [Build the two local binaries](#build-the-two-local-binaries) exactly
-   (vcpkg + `DISABLE_SANITIZER=1`).
-3. **Write `.env`** by pointing `setup.sh` at those two paths:
-   ```bash
-   DBT_BIN=/path/to/fs/target/debug/dbt \
-   DUCKDB_BUILD_DIR=/path/to/duckdb-iceberg \
-   scripts/setup.sh
-   source .env                            # or: set -a && source .env && set +a
-   ```
-4. **Run the demo** (builds into the zero-credential `ducklake` catalog):
-   ```bash
-   "$DBT_BIN" seed                        # load the committed seed
-   "$DBT_BIN" run                         # build 5 models into ducklake
-   ```
-5. **Inspect the output** — see [Setup and run](#setup-and-run).
-6. **(optional) Try another catalog** — pick one of `lakekeeper` / `horizon` /
-   `polaris` / `unity`, one at a time, per
-   [Switching catalogs](#switching-catalogs). Verified writing 5/5: ducklake,
-   lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
-
 ## How it works
 
 ![How catalogs.yml definitions map to catalogs and route the dbt DAG by catalog](docs/catalog-routing.png)
@@ -75,7 +45,7 @@ daily_*                            (output catalog = +catalog_name in dbt_projec
 | `horizon` | Snowflake Horizon (Polaris REST) | ✅ | Snowflake creds (`SNOWFLAKE_*`) |
 | `polaris` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
 | `unity` | Databricks Unity Catalog | ✅ | Databricks creds (`DATABRICKS_*`) |
-| `s3_tables` | Amazon S3 Tables | 🧪 driver-only (adapter pending [fs#10806](https://github.com/dbt-labs/fs/pull/10806)) | AWS creds |
+| `s3_tables` | Amazon S3 Tables | 🧪 driver-only (Fusion adapter support pending) | AWS creds |
 
 `horizon` and `unity` writes need the write-compat attach options from
 [duckdb/duckdb-iceberg#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017)
@@ -83,12 +53,16 @@ daily_*                            (output catalog = +catalog_name in dbt_projec
 `catalogs.yml` blocks set `read_only: false` (+ `disable_multi_table_commit`).
 `horizon` additionally requires **key-pair auth** (a PAT can read but not write)
 and an **uppercase** target schema (`CATALOG_SCHEMA=AWS_CLOUD_COST`) — see
-[External-catalog credentials](#external-catalog-credentials). This is
+[External-catalog credentials](#external-catalog-credentials). Unity here is
 **proprietary Databricks** Unity Catalog; OSS `unitycatalog/unitycatalog` is a
 separate target tracked in
 [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).
 
-## Prerequisites
+## Quick start
+
+The default `ducklake` path needs **no credentials**.
+
+### Prerequisites
 
 - macOS or Linux
 - A Rust toolchain (`cargo`) and a C++ toolchain (`make`, CMake) to build the
@@ -99,25 +73,50 @@ separate target tracked in
 - Credentials only for whichever external catalog you want to exercise. The
   default `ducklake` path needs none.
 
+### Steps
+
+1. **Build the two local debug binaries** (not published anywhere) and note their
+   paths — the Fusion `dbt` binary and the `duckdb-iceberg` driver. This is the
+   step newcomers trip on; follow
+   [Build the two local binaries](#build-the-two-local-binaries) exactly
+   (vcpkg + `DISABLE_SANITIZER=1`).
+2. **Write `.env`** by pointing `setup.sh` at those two paths:
+   ```bash
+   DBT_BIN=/path/to/dbt-fusion/target/debug/dbt \
+   DUCKDB_BUILD_DIR=/path/to/duckdb-iceberg \
+   scripts/setup.sh
+   source .env                            # or: set -a && source .env && set +a
+   ```
+3. **Run the demo** (builds into the zero-credential `ducklake` catalog):
+   ```bash
+   "$DBT_BIN" seed                        # load the committed seed
+   "$DBT_BIN" run                         # build the models into ducklake
+   ```
+4. **Inspect the output** — see [Setup and run](#setup-and-run).
+5. **(optional) Try another catalog** — pick one of `lakekeeper` / `horizon` /
+   `polaris` / `unity`, one at a time, per
+   [Switching catalogs](#switching-catalogs). Verified writing: ducklake,
+   lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
+
 ## Build the two local binaries
 
 This demo depends on two locally built debug binaries that are **not** published
 anywhere — the prerequisite a newcomer is most likely to trip on. The absolute
 paths below are examples; use wherever you checked the repos out.
 
-1. **Custom Fusion `dbt` binary** — from an `fs` checkout that includes the
-   **catalogs v2 read-write** work. That is the Fusion side of
-   [dbt-core#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml
-   v2 part 2 — Horizon & Unity read-write", stacked on part 1
-   [#15238](https://github.com/dbt-labs/dbt-core/pull/15238)), mirrored internally
-   as `dbt-labs/fs#10950`. Until it lands on `fs` `main`, build from that branch:
+1. **Custom Fusion `dbt` binary** — from a Fusion (`dbt-fusion`) checkout that
+   includes the **catalogs v2 read-write** work: dbt-core
+   [#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml v2
+   part 2 — Horizon & Unity read-write", stacked on part 1
+   [#15238](https://github.com/dbt-labs/dbt-core/pull/15238)). Until that ships
+   in a published build, compile it from a branch that has it:
 
    ```bash
-   cd /path/to/your/fs            # e.g. ~/Developer/fs, on the catalogs-v2 branch
+   cd /path/to/your/dbt-fusion    # e.g. ~/Developer/dbt-fusion, on the catalogs-v2 branch
    cargo build --bin dbt          # produces target/debug/dbt
    ```
 
-   Then set `DBT_BIN=/path/to/your/fs/target/debug/dbt`.
+   Then set `DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt`.
 
 2. **`duckdb-iceberg` debug build** — from the **`v1.5-variegata` branch** of
    [`duckdb/duckdb-iceberg`](https://github.com/duckdb/duckdb-iceberg/tree/v1.5-variegata),
@@ -170,7 +169,7 @@ that, dbt would load a stock DuckDB and catalog writes would fail.
 From the repo root, point at your two binaries and let `setup.sh` write `.env`:
 
 ```bash
-DBT_BIN=/path/to/your/fs/target/debug/dbt \
+DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt \
 DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg \
 scripts/setup.sh
 
@@ -215,41 +214,85 @@ For any non-default catalog, copy the matching section from `.env.example` into
 `.env`, fill it in, then uncomment that catalog's block in `catalogs.yml` and its
 secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
 
-- **lakekeeper** — no credentials; `docker compose up -d` (lakekeeper + minio +
-  postgres), then run. Teardown with `docker compose down -v`.
-- **horizon** (Snowflake) — set the `SNOWFLAKE_*` key-pair vars, then:
-  ```bash
-  scripts/configure_horizon_schema.sh  # one-time: schema CATALOG=SNOWFLAKE + writable external volume
-  scripts/refresh_horizon_token.sh     # mints a KEY-PAIR access token -> HORIZON_ACCESS_TOKEN (~55 min)
-  scripts/doctor.sh                    # checks SQL-API + Horizon connectivity
-  ```
-  Two non-obvious requirements for external-engine **writes** to Horizon (both
-  needed — see `memory` / commit notes):
-  - **Key-pair auth, not a PAT.** A Snowflake PAT can *read* via the Horizon
-    Iceberg REST catalog but `createTable` 403s. `refresh_horizon_token.sh` mints
-    a key-pair JWT access token; the profile uses it as a bearer token. Re-run it
-    if the token expires.
-  - **Uppercase, writable external volume.** The REST namespace is
-    case-sensitive on write, so the target schema must be `AWS_CLOUD_COST`
-    (set `CATALOG_SCHEMA=AWS_CLOUD_COST` — keep `+schema: aws_cloud_cost` so the
-    `generate_schema_name` macro substitutes it). Use a real S3 external volume
-    with `ALLOW_WRITES=TRUE` (e.g. `FUSION_ADAPTERS_CI_TEMP`) and set
-    `SNOWFLAKE_DEFAULT_REGION` to that volume's region (`us-east-1`) — not
-    `SNOWFLAKE_MANAGED` (its internal storage can't be written by an external engine).
-- **polaris** — set the `POLARIS_*` vars.
-- **unity** (Databricks) — set `DATABRICKS_*`; reads **and writes** work. The
-  `catalogs.yml` block sets `read_only: false` + `disable_multi_table_commit`
-  (without them, `createTable` 403s — which is what made it look read-only).
-  Databricks UC accepts either schema case. (OSS Unity Catalog is a separate
-  target — see [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).)
-- **s3_tables** (experimental) — set `AWS_S3_TABLES_*`; auth uses the standard
-  AWS credential chain (configure your AWS SSO/profile). **The Fusion adapter does
-  not accept `type: s3_tables` yet** — support is pending
-  [fs#10806](https://github.com/dbt-labs/fs/pull/10806). The underlying driver
-  already works (`ATTACH '<bucket-arn>' (TYPE iceberg, ENDPOINT_TYPE 's3_tables')`),
-  and writes benchmark as the fastest of the remote catalogs (~1.8s/table, vs
-  Unity ~5.5s, Horizon ~12s). Note: live AWS creds and the local `lakekeeper`
-  (minio) target can't be active in the same run.
+The tables below list the permissions the catalog's principal needs to **write**
+from an external engine (reads need a subset). Privilege names follow each
+provider's own docs — treat them as the minimum to get the demo writing, not an
+exhaustive security policy.
+
+### lakekeeper (local — no credentials)
+
+`docker compose up -d` (lakekeeper + minio + postgres), then run; teardown with
+`docker compose down -v`. No cloud permissions: the warehouse attaches with
+`AUTHORIZATION_TYPE NONE` and the static minio keys baked into `profiles.yml`.
+
+### horizon (Snowflake)
+
+Set the `SNOWFLAKE_*` key-pair vars, then:
+
+```bash
+scripts/configure_horizon_schema.sh  # one-time: catalog-linked schema + writable external volume
+scripts/refresh_horizon_token.sh     # mints a KEY-PAIR access token -> HORIZON_ACCESS_TOKEN (~55 min)
+scripts/doctor.sh                    # checks SQL-API + Horizon connectivity
+```
+
+| Object | Privilege / setting | Why |
+| --- | --- | --- |
+| user | **key-pair (RSA) auth** | a PAT can *read* but `createTable` 403s on write |
+| schema | `CATALOG = 'SNOWFLAKE'` (catalog-linked) + `CREATE ICEBERG TABLE` | models create Iceberg tables here |
+| schema name | **UPPERCASE** (`AWS_CLOUD_COST`) | the REST namespace is case-sensitive on write |
+| external volume | `ALLOW_WRITES = TRUE` + `USAGE` granted to the role | the external engine writes data files here — not `SNOWFLAKE_MANAGED` (its internal storage can't be written externally) |
+| warehouse + database | `USAGE` | resolve and run |
+| region | `SNOWFLAKE_DEFAULT_REGION` = the volume's region (`us-east-1`) | must match the external volume |
+
+Keep `+schema: aws_cloud_cost` so the `generate_schema_name` macro substitutes
+the uppercase `CATALOG_SCHEMA`. Re-run `refresh_horizon_token.sh` when the token
+expires.
+
+### polaris (Iceberg REST)
+
+Set the `POLARIS_*` vars. The principal's catalog role needs namespace + table
+write privileges:
+
+| Privilege | Scope |
+| --- | --- |
+| `TABLE_CREATE`, `TABLE_WRITE_DATA` | catalog / namespace |
+| `NAMESPACE_CREATE` | catalog |
+| `PRINCIPAL_ROLE:ALL` (or a role granting the above) | principal |
+
+### unity (Databricks)
+
+Set `DATABRICKS_*`; reads **and writes** work. The token's principal needs, on the
+target catalog and schema:
+
+| Object | Privilege |
+| --- | --- |
+| catalog | `USE CATALOG` |
+| schema | `USE SCHEMA`, `CREATE TABLE` |
+| schema | `EXTERNAL USE SCHEMA` (required for external Iceberg-REST clients) |
+
+The `catalogs.yml` block also sets `read_only: false` + `disable_multi_table_commit`
+(without them `createTable` 403s — which is what made it look read-only).
+Databricks UC accepts either schema case. (OSS Unity Catalog is a separate
+target — see [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).)
+
+### s3_tables (Amazon S3 Tables — experimental)
+
+Set `AWS_S3_TABLES_*`; auth uses the standard AWS credential chain (configure your
+AWS SSO/profile). **The Fusion adapter does not accept `type: s3_tables` yet**
+(support pending) — the driver already works
+(`ATTACH '<bucket-arn>' (TYPE iceberg, ENDPOINT_TYPE 's3_tables')`), and writes
+benchmark as the fastest of the remote catalogs (~1.8s/table, vs Unity ~5.5s,
+Horizon ~12s). The IAM principal needs:
+
+| Action (or managed policy) | Scope |
+| --- | --- |
+| `AmazonS3TablesFullAccess` (managed) — or the granular actions below | table bucket |
+| `s3tables:CreateNamespace`, `CreateTable`, `GetTable`, `GetTableMetadataLocation`, `UpdateTableMetadataLocation` | table bucket |
+| `s3tables:GetTableData`, `PutTableData` | table data |
+
+A table bucket + namespace must already exist
+(`aws s3tables create-table-bucket` / `create-namespace`). Note: live AWS creds
+and the local `lakekeeper` (minio) target can't be active in the same run.
 
 ## Regenerating the seed
 
