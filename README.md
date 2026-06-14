@@ -1,33 +1,28 @@
 # dbt multi-catalog demo (AWS cloud cost on DuckDB)
 
-A clone-and-run dbt project that shows the **same models written to different
-output catalogs** using dbt's catalogs v2. The transformation is a small AWS
-Cost & Usage Report pipeline; the interesting part is that you can point the
-models at any of several Iceberg / lakehouse catalogs by changing one config
-value. The default path (`ducklake`) runs with **zero credentials**.
+A simple dbt project using dbt Core v2 and DuckDB to demonstrate the power of dbt's catalogs v2 spec.
 
-> Throughout, "dbt" means the locally built Fusion `dbt` binary
-> (see [Build the two local binaries](#build-the-two-local-binaries)), not a
-> `pip`-installed dbt Core.
+Models can arbitrarily be written to different external Iceberg REST catalogs.
+
+The source data is a mocked version of AWS's Cost & Usage Report pipeline.
+
+The models are adapted from Fivetran's
+[`dbt_aws_cloud_cost`](https://github.com/fivetran/dbt_aws_cloud_cost) package;
+this repo repurposes them to demonstrate catalogs v2.
+
+The default path (`ducklake`) runs with **zero credentials**.
+
+> Throughout, "dbt" means the locally built dbt Core v2 `dbt` binary
+> (see [Build the two local binaries](#build-the-two-local-binaries))
 
 ## How it works
-
-![How catalogs.yml definitions map to catalogs and route the dbt DAG by catalog](docs/catalog-routing.png)
 
 Each model picks its output catalog with `+catalog_name`, which dbt resolves to a
 block in `catalogs.yml`. Staging stays in the built-in DuckDB catalog; final models
 can fan out to external catalogs (DuckLake / Horizon / Unity / …). The pipeline at a
 glance:
 
-```
-seeds/aws_cost_report.csv          (committed sample data; `dbt seed` loads it
-        |                           into the built-in DuckDB catalog)
-        v
-stg_report                         (reads the seed directly)
-        |
-        v
-daily_*                            (output catalog = +catalog_name in dbt_project.yml)
-```
+![How catalogs.yml definitions map to catalogs and route the dbt DAG by catalog](docs/catalog-routing.png)
 
 - The **source** is a committed seed (`seeds/aws_cost_report.csv`), loaded by
   `dbt seed`. No external source catalog to attach, so the demo runs offline.
