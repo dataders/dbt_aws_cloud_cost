@@ -88,6 +88,21 @@ catalogs:
 #         attach_as: "polaris"
 #         default_schema: "aws_cloud_cost"
 
+#   - name: r2
+#     type: iceberg_rest
+#     table_format: iceberg
+#     config:
+#       duckdb:
+#         endpoint: "{{ env_var('R2_CATALOG_URI', 'https://catalog.cloudflarestorage.com/<account_id>/<bucket>') }}"
+#         warehouse: "{{ env_var('R2_WAREHOUSE', '<account_id>_<bucket>') }}"
+#         secret: r2_token
+        ## R2 authenticates with a bearer token carried in the r2_token secret —
+        ## no authorization_type / access_delegation_mode needed. R2 accepts
+        ## DuckDB's client-set table location, so writes (createTable + insert)
+        ## work on stock DuckDB with no #1017 compat options. Verified 2026-06-16.
+#         attach_as: "r2"
+#         default_schema: "aws_cloud_cost"
+
 #   - name: s3_tables
 #     type: s3_tables
 #     table_format: iceberg
