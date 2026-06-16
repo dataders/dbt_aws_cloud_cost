@@ -220,6 +220,19 @@ exhaustive security policy.
 `docker compose down -v`. No cloud permissions: the warehouse attaches with
 `AUTHORIZATION_TYPE NONE` and the static minio keys baked into `profiles.yml`.
 
+The warehouse advertises its storage endpoint as `http://minio:9000` (set by the
+`initialwarehouse` service). For that hostname to resolve from your host — needed
+by both dbt and the Lakekeeper UI's in-browser data preview — add this one-time
+entry to `/etc/hosts`:
+
+```
+127.0.0.1 minio
+```
+
+`docker-compose.yml` publishes minio on port `9000` (matching the advertised
+endpoint) and sets `MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:18181` so the
+browser preview can read Iceberg metadata directly from object storage.
+
 ### horizon (Snowflake)
 
 Set the `SNOWFLAKE_*` key-pair vars, then:
@@ -313,6 +326,14 @@ this repo; reintroduce a generator separately if you need fresh data.
   `ducklake` path needs none).
 - **lakekeeper hangs / can't attach** — confirm `docker compose up -d` is healthy
   at `http://localhost:18181`.
+- **Lakekeeper UI "Failed to load preview / CORS Error"** — the in-browser
+  preview reads object storage at the advertised endpoint `http://minio:9000`.
+  Three things must agree: (1) `127.0.0.1 minio` in `/etc/hosts`, (2) minio
+  published on host port `9000` (`docker-compose.yml`), and (3)
+  `MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:18181` on the minio service. If
+  you changed any, recreate with `docker compose up -d --force-recreate minio`
+  and hard-refresh the tab. A connection failure to `minio:9000` surfaces in the
+  UI as a generic "CORS Error", so check reachability first.
 - **Unity writes fail (`403`)** — the unity `catalogs.yml` block is missing
   `read_only: false` / `disable_multi_table_commit: true`. Unity writes *do* work
   with both set; without them `createTable` 403s (which originally looked like
