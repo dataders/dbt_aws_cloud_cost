@@ -46,6 +46,10 @@ aws_cloud_cost:
 #           oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
 #           oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
 #           oauth2_grant_type: "client_credentials"
+#         ## r2 (Cloudflare R2 Data Catalog) — uncomment with the r2 catalog block
+#         - type: iceberg
+#           name: r2_token
+#           token: "{{ env_var('R2_TOKEN_VALUE', '') }}"
 #         ## s3_tables — uncomment with the s3_tables catalog block
 #         - type: s3
 #           name: aws_s3_tables
