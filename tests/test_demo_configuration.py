@@ -127,7 +127,7 @@ class DemoConfigurationTest(unittest.TestCase):
         readme = self.read("README.md")
         for snippet in [
             ".env.example",
-            "DISABLE_SANITIZER",
+            "DuckDB 1.5.4",
             "dbt seed",
             "+catalog_name",
             "docker compose up",

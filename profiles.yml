@@ -13,13 +13,12 @@ aws_cloud_cost:
       schema: aws_cloud_cost
       threads: 4
       settings:
-        ## The locally built duckdb-iceberg driver ships httpfs/iceberg/ducklake
-        ## as STATICALLY-LINKED built-ins. Disabling autoinstall/autoload forces
-        ## DuckDB to use those built-ins instead of fetching the official (or
-        ## stale) extensions from the network or ~/.duckdb — which is what causes
-        ## "unsigned extension" / "Unhandled options" failures.
-        autoinstall_known_extensions: false
-        autoload_known_extensions: false
+        ## The official DuckDB 1.5.4 driver (fetched from the dbt CDN) does NOT
+        ## statically link httpfs/iceberg/ducklake, so DuckDB autoloads (and, on
+        ## first use, autoinstalls) those signed extensions from the official
+        ## extension repository. Leave autoinstall/autoload enabled.
+        autoinstall_known_extensions: true
+        autoload_known_extensions: true
       secrets:
         ## horizon (Snowflake) — uncomment with the horizon catalog block.
         ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).

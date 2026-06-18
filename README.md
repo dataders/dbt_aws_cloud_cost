@@ -13,7 +13,7 @@ this repo repurposes them to demonstrate catalogs v2.
 The default path (`ducklake`) runs with **zero credentials**.
 
 > Throughout, "dbt" means the locally built dbt Core v2 `dbt` binary
-> (see [Build the two local binaries](#build-the-two-local-binaries))
+> (see [Build the dbt binary](#build-the-dbt-binary))
 
 ## How it works
 
@@ -44,8 +44,9 @@ glance:
 
 `horizon` and `unity` writes need the write-compat attach options from
 [duckdb/duckdb-iceberg#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017)
-(shipping in DuckDB 1.5.4) — the locally built driver includes them, and the
-`catalogs.yml` blocks set `read_only: false` (+ `disable_multi_table_commit`).
+(**shipped in DuckDB 1.5.4**) — the official DuckDB driver fetched from the dbt
+CDN includes them, and the `catalogs.yml` blocks set `read_only: false`
+(+ `disable_multi_table_commit`).
 `horizon` additionally requires **key-pair auth** (a PAT can read but not write)
 and an **uppercase** target schema (`CATALOG_SCHEMA=AWS_CLOUD_COST`) — see
 [External-catalog credentials](#external-catalog-credentials). Unity here is
@@ -60,8 +61,7 @@ The default `ducklake` path needs **no credentials**.
 ### Prerequisites
 
 - macOS or Linux
-- A Rust toolchain (`cargo`) and a C++ toolchain (`make`, CMake) to build the
-  two local binaries below; plus `git` for the vcpkg checkout
+- A Rust toolchain (`cargo`) to build the one local `dbt` binary below
 - `docker` — only for the `lakekeeper` catalog
 - [`uv`](https://docs.astral.sh/uv/) — only for the optional Snowflake helper
   scripts (`scripts/*.sh`)
@@ -70,15 +70,13 @@ The default `ducklake` path needs **no credentials**.
 
 ### Steps
 
-1. **Build the two local debug binaries** (not published anywhere) and note their
-   paths — the Fusion `dbt` binary and the `duckdb-iceberg` driver. This is the
-   step newcomers trip on; follow
-   [Build the two local binaries](#build-the-two-local-binaries) exactly
-   (vcpkg + `DISABLE_SANITIZER=1`).
-2. **Write `.env`** by pointing `setup.sh` at those two paths:
+1. **Build the local `dbt` binary** (not published anywhere) and note its path —
+   a Fusion `dbt` binary with catalogs v2 read-write. The DuckDB driver is the
+   official DuckDB 1.5.4 release, fetched from the dbt CDN — nothing else to
+   build. See [Build the dbt binary](#build-the-dbt-binary).
+2. **Write `.env`** by pointing `setup.sh` at that path:
    ```bash
    DBT_BIN=/path/to/dbt-fusion/target/debug/dbt \
-   DUCKDB_BUILD_DIR=/path/to/duckdb-iceberg \
    scripts/setup.sh
    source .env                            # or: set -a && source .env && set +a
    ```
@@ -93,79 +91,42 @@ The default `ducklake` path needs **no credentials**.
    [Switching catalogs](#switching-catalogs). Verified writing: ducklake,
    lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
 
-## Build the two local binaries
+## Build the dbt binary
 
-This demo depends on two locally built debug binaries that are **not** published
-anywhere — the prerequisite a newcomer is most likely to trip on. The absolute
-paths below are examples; use wherever you checked the repos out.
+This demo depends on one locally built binary that is **not** published anywhere
+— a Fusion `dbt` binary with the **catalogs v2 read-write** work. The DuckDB
+driver itself is the **official DuckDB 1.5.4 release**, fetched automatically
+from the dbt CDN on first run; there is nothing else to build (no
+`duckdb-iceberg` checkout, no vcpkg, no `DISABLE_SANITIZER`).
 
-1. **Custom Fusion `dbt` binary** — from a Fusion (`dbt-fusion`) checkout that
-   includes the **catalogs v2 read-write** work: dbt-core
-   [#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml v2
-   part 2 — Horizon & Unity read-write", stacked on part 1
-   [#15238](https://github.com/dbt-labs/dbt-core/pull/15238)). Until that ships
-   in a published build, compile it from a branch that has it:
+From a Fusion (`dbt-fusion`) checkout that includes catalogs v2 read-write —
+dbt-core [#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml
+v2 part 2 — Horizon & Unity read-write", stacked on part 1
+[#15238](https://github.com/dbt-labs/dbt-core/pull/15238)). Until that ships in a
+published build, compile it from a branch that has it:
 
-   ```bash
-   cd /path/to/your/dbt-fusion    # e.g. ~/Developer/dbt-fusion, on the catalogs-v2 branch
-   cargo build --bin dbt          # produces target/debug/dbt
-   ```
+```bash
+cd /path/to/your/dbt-fusion    # e.g. ~/Developer/dbt-fusion, on the catalogs-v2 branch
+cargo build --bin dbt          # produces target/debug/dbt
+```
 
-   Then set `DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt`.
+Then set `DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt`.
 
-2. **`duckdb-iceberg` debug build** — from the **`v1.5-variegata` branch** of
-   [`duckdb/duckdb-iceberg`](https://github.com/duckdb/duckdb-iceberg/tree/v1.5-variegata),
-   the DuckDB 1.5.4 line. It carries duckdb-iceberg
-   [#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017) /
-   [#1018](https://github.com/duckdb/duckdb-iceberg/pull/1018) /
-   [#1020](https://github.com/duckdb/duckdb-iceberg/pull/1020) — the write-compat
-   options the v2 Horizon/Unity catalogs need, which aren't in a stable DuckDB
-   release yet. A plain `main`/release checkout will not work.
-
-   ```bash
-   git clone -b v1.5-variegata https://github.com/duckdb/duckdb-iceberg.git
-   ```
-
-   Two more non-obvious requirements; get either wrong and `dbt run` fails in
-   confusing ways (`Unhandled options found`, unsigned-extension errors, or
-   `AddressSanitizer ... loaded too late`):
-
-   **a. vcpkg.** The `avro`/`httpfs` extensions resolve C deps through it. Use a
-   **full (non-shallow)** vcpkg clone at the commit pinned in
-   `duckdb-iceberg/vcpkg.json` (`builtin-baseline`) — a shallow clone fails on
-   the version-pinned `openssl`/`aws-c-http` ports:
-
-   ```bash
-   git clone https://github.com/microsoft/vcpkg.git ~/Developer/vcpkg
-   cd ~/Developer/vcpkg && git checkout <builtin-baseline from vcpkg.json> && ./bootstrap-vcpkg.sh
-   export VCPKG_TOOLCHAIN_PATH="$HOME/Developer/vcpkg/scripts/buildsystems/vcpkg.cmake"
-   ```
-
-   **b. Build WITHOUT sanitizers.** A stock `make debug` enables AddressSanitizer,
-   and an ASAN `libduckdb.dylib` cannot be `dlopen`'d by the (non-ASAN) `dbt`
-   binary. Always pass `DISABLE_SANITIZER=1`:
-
-   ```bash
-   cd /path/to/your/duckdb-iceberg
-   DISABLE_SANITIZER=1 make debug     # builds build/debug/{duckdb, src/libduckdb.dylib, repository}
-   ```
-
-   Then set `DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg`.
-
-This build ships `httpfs`, `iceberg`, and `ducklake` as **statically-linked
-built-ins**. dbt loads the driver from `ADBC_REPOSITORY`, which points straight
-at `build/debug/src` (that dir already contains `libduckdb.dylib`). The profile
-sets `autoinstall_known_extensions: false` / `autoload_known_extensions: false`
-so DuckDB uses those built-ins instead of fetching official extensions — without
-that, dbt would load a stock DuckDB and catalog writes would fail.
+The write-compat attach options the v2 Horizon/Unity catalogs need (duckdb-iceberg
+[#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017) /
+[#1018](https://github.com/duckdb/duckdb-iceberg/pull/1018) /
+[#1020](https://github.com/duckdb/duckdb-iceberg/pull/1020)) **shipped in DuckDB
+1.5.4**, so the official driver carries them. dbt downloads the signed `httpfs`,
+`iceberg`, and `ducklake` extensions from the official extension repository on
+first use (`autoinstall_known_extensions` / `autoload_known_extensions` are
+enabled in `profiles.yml`).
 
 ## Setup and run
 
-From the repo root, point at your two binaries and let `setup.sh` write `.env`:
+From the repo root, point at your `dbt` binary and let `setup.sh` write `.env`:
 
 ```bash
 DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt \
-DUCKDB_BUILD_DIR=/path/to/your/duckdb-iceberg \
 scripts/setup.sh
 
 set -a && source .env && set +a        # load it (or: direnv allow)
@@ -174,14 +135,14 @@ set -a && source .env && set +a        # load it (or: direnv allow)
 "$DBT_BIN" run                         # build the models into the ducklake catalog
 ```
 
-`setup.sh` validates the binaries and writes a credential-free `.env` (it won't
+`setup.sh` validates the binary and writes a credential-free `.env` (it won't
 overwrite an existing one). Prefer to fill it in by hand? Copy `.env.example` to
-`.env` and edit the two paths instead — `setup.sh` is just a convenience.
+`.env` and edit the `DBT_BIN` path instead — `setup.sh` is just a convenience.
 
-Inspect the result (any DuckLake-1.0-capable DuckDB):
+Inspect the result (any DuckLake-1.0-capable DuckDB CLI — e.g. `brew install duckdb`):
 
 ```bash
-"$DUCKDB_CLI" :memory: -c \
+duckdb :memory: -c \
   "ATTACH 'ducklake:./data/ducklake.db' AS dl;
    SELECT * FROM dl.aws_cloud_cost.daily_overview LIMIT 5;"
 ```
@@ -314,11 +275,17 @@ this repo; reintroduce a generator separately if you need fresh data.
 
 ## Troubleshooting
 
-- **`Unhandled options found` / unsigned-extension errors on a run** — dbt loaded
-  a stock DuckDB instead of your local build. Confirm `ADBC_REPOSITORY` points at
-  your `duckdb-iceberg/build/debug/src` and that `DISABLE_CDN_DRIVER_CACHE=true`.
-- **`AddressSanitizer ... loaded too late`** — rebuild duckdb-iceberg with
-  `DISABLE_SANITIZER=1 make debug`.
+- **extension load / autoload errors on a run** — the official driver fetches
+  `httpfs` / `iceberg` / `ducklake` from the extension repository on first use,
+  so the first run needs network access. Confirm `autoinstall_known_extensions`
+  and `autoload_known_extensions` are `true` in `profiles.yml` (the default).
+- **Horizon / Unity writes fail (`Unhandled options` / `createTable` errors)** —
+  these catalogs need the write-compat ATTACH options from duckdb-iceberg #1017,
+  which require **DuckDB 1.5.4**. dbt ships the official 1.5.4 driver on its CDN,
+  but if a DuckDB ≥1.5.4 is installed on your system the loader uses that
+  instead — so an older system DuckDB (e.g. Homebrew 1.5.3) will be missing
+  #1017. Upgrade your system DuckDB to ≥1.5.4 (the credential-free `ducklake`
+  path works on 1.5.3 too). Reads aren't affected.
 - **catalog name mismatch** — `+catalog_name` in `dbt_project.yml` must equal the
   single uncommented catalog in `catalogs.yml` (the pytest invariant checks this).
 - **OAuth errors on a local run** — you uncommented a secret block in
