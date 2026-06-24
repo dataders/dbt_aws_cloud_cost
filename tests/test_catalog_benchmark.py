@@ -108,6 +108,22 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql
         )
 
+    def test_run_sql_loads_iceberg_extension_after_disabling_autoload(self):
+        target = self.bench.load_targets()["lakekeeper_local"]
+        sql, _ = self.bench.render_run_sql(
+            target=target,
+            env={},
+            variant=self.bench.ATTACH_VARIANTS["default"],
+            size=self.bench.BenchmarkSize("tiny", 4),
+            repetition=1,
+            output_dir=ROOT / ".tmp",
+            threads=4,
+            memory_limit="4GB",
+            keep_tables=False,
+        )
+
+        self.assertIn("SET autoload_known_extensions=false;\nLOAD iceberg;", sql)
+
     def test_redaction_removes_known_secret_values_and_bearer_headers(self):
         env = {
             "HORIZON_ACCESS_TOKEN": "super-secret-token",
@@ -116,8 +132,14 @@ class CatalogBenchmarkTest(unittest.TestCase):
         }
         text = (
             "TOKEN 'super-secret-token'\n"
+            "Authorization='Basic YmFkLWJhc2lj'\n"
+            "Authorization='AWS4-HMAC-SHA256 "
+            "Credential=AKIA/20260624/us-east-1/s3/aws4_request, "
+            "SignedHeaders=host, Signature=deadbeef'\n"
             "Authorization=Bearer abc.def\n"
             "client_secret=polaris-secret\n"
+            "x-amz-security-token='bad-session-token'\n"
+            "https://example.com/path?X-Amz-Credential=AKIA%2F20260624&X-Amz-Signature=deadbeef&X-Amz-Security-Token=bad-query-token\n"
             "id=client-id-is-not-secret"
         )
 
@@ -125,7 +147,12 @@ class CatalogBenchmarkTest(unittest.TestCase):
 
         self.assertNotIn("super-secret-token", redacted)
         self.assertNotIn("polaris-secret", redacted)
+        self.assertNotIn("YmFkLWJhc2lj", redacted)
+        self.assertNotIn("AWS4-HMAC-SHA256 Credential=AKIA", redacted)
         self.assertNotIn("Bearer abc.def", redacted)
+        self.assertNotIn("bad-session-token", redacted)
+        self.assertNotIn("deadbeef", redacted)
+        self.assertNotIn("bad-query-token", redacted)
         self.assertIn("client-id-is-not-secret", redacted)
 
 
