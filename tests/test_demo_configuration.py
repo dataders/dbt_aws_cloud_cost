@@ -75,7 +75,9 @@ class DemoConfigurationTest(unittest.TestCase):
         for name in ALL_CATALOGS:
             with self.subTest(name=name):
                 self.assertTrue(
-                    f"  - name: {name}" in catalogs or f"#   - name: {name}" in catalogs,
+                    f"  - name: {name}" in catalogs
+                    or f"#   - name: {name}" in catalogs
+                    or f"  # - name: {name}" in catalogs,
                     f"catalog block missing entirely: {name}",
                 )
 
