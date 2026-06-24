@@ -1,0 +1,114 @@
+"""Unit tests for the raw DuckDB catalog benchmark harness.
+
+Run: uv run tests/test_catalog_benchmark.py -v
+"""
+
+import importlib.util
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+MODULE_PATH = ROOT / "scripts" / "catalog_benchmark.py"
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("catalog_benchmark", MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class CatalogBenchmarkTest(unittest.TestCase):
+    def setUp(self):
+        self.bench = load_module()
+
+    def test_size_matrix_supports_named_defaults_and_explicit_rows(self):
+        named = self.bench.parse_size_matrix("tiny,medium", None)
+        self.assertEqual([(size.label, size.rows) for size in named], [("tiny", 4), ("medium", 1_000_000)])
+
+        explicit = self.bench.parse_size_matrix(None, "7,42")
+        self.assertEqual(
+            [(size.label, size.rows) for size in explicit],
+            [("rows_7", 7), ("rows_42", 42)],
+        )
+
+    def test_attach_variants_cover_horizon_ablation_cases(self):
+        variants = self.bench.ATTACH_VARIANTS
+        for name in [
+            "default",
+            "no_stage_create",
+            "no_multi_commit",
+            "skip_create_metadata_updates",
+            "no_cleanup_on_rollback",
+            "legacy_full_compat",
+        ]:
+            with self.subTest(name=name):
+                self.assertIn(name, variants)
+
+        legacy_options = variants["legacy_full_compat"].options
+        self.assertEqual(legacy_options["STAGE_CREATE_TABLES"], "false")
+        self.assertEqual(legacy_options["DISABLE_MULTI_TABLE_COMMIT"], "true")
+        self.assertEqual(legacy_options["SKIP_CREATE_TABLE_METADATA_UPDATES"], "true")
+        self.assertEqual(legacy_options["REMOVE_FILES_ON_DELETE"], "false")
+
+    def test_target_missing_env_reports_only_required_names(self):
+        target = self.bench.load_targets()["horizon"]
+        missing = self.bench.missing_env(target, {"HORIZON_ENDPOINT": "https://example"})
+        self.assertEqual(
+            missing,
+            ["HORIZON_WAREHOUSE", "HORIZON_ACCESS_TOKEN", "HORIZON_SCHEMA", "SNOWFLAKE_DEFAULT_REGION"],
+        )
+
+    def test_horizon_sql_uses_secret_name_and_legacy_options(self):
+        env = {
+            "HORIZON_ENDPOINT": "https://acct.snowflakecomputing.com/polaris/api/catalog",
+            "HORIZON_WAREHOUSE": "CODEX_HORIZON_DEMO",
+            "HORIZON_ACCESS_TOKEN": "super-secret-token",
+            "HORIZON_SCHEMA": "AWS_CLOUD_COST",
+            "SNOWFLAKE_DEFAULT_REGION": "us-east-1",
+        }
+        target = self.bench.load_targets(env)["horizon"]
+
+        secret_sql = self.bench.render_secret_sql(target, env)
+        attach_sql = self.bench.render_attach_sql(target, env, self.bench.ATTACH_VARIANTS["legacy_full_compat"])
+
+        self.assertIn("CREATE OR REPLACE SECRET snowflake_oauth", secret_sql)
+        self.assertIn("TOKEN 'super-secret-token'", secret_sql)
+        self.assertIn("ATTACH 'CODEX_HORIZON_DEMO' AS horizon", attach_sql)
+        self.assertIn("SECRET snowflake_oauth", attach_sql)
+        self.assertIn("STAGE_CREATE_TABLES false", attach_sql)
+        self.assertIn("DISABLE_MULTI_TABLE_COMMIT true", attach_sql)
+        self.assertIn("SKIP_CREATE_TABLE_METADATA_UPDATES true", attach_sql)
+        self.assertIn("REMOVE_FILES_ON_DELETE false", attach_sql)
+
+    def test_workload_sql_varies_table_name_and_row_count(self):
+        target = self.bench.load_targets()["lakekeeper_local"]
+        size = self.bench.BenchmarkSize("small", 10_000)
+        sql = self.bench.render_workload_sql(target, "legacy_full_compat", size, repetition=2, keep_tables=False)
+
+        self.assertIn("bench_legacy_full_compat_small_r2", sql)
+        self.assertIn("FROM range(10000)", sql)
+        self.assertIn("SELECT count(*) AS row_count", sql)
+        self.assertIn("DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql)
+
+    def test_redaction_removes_known_secret_values_and_bearer_headers(self):
+        env = {
+            "HORIZON_ACCESS_TOKEN": "super-secret-token",
+            "POLARIS_SECRET": "polaris-secret",
+            "POLARIS_ID": "client-id-is-not-secret",
+        }
+        text = "TOKEN 'super-secret-token'\nAuthorization=Bearer abc.def\nclient_secret=polaris-secret\nid=client-id-is-not-secret"
+
+        redacted = self.bench.redact(text, env)
+
+        self.assertNotIn("super-secret-token", redacted)
+        self.assertNotIn("polaris-secret", redacted)
+        self.assertNotIn("Bearer abc.def", redacted)
+        self.assertIn("client-id-is-not-secret", redacted)
+
+
+if __name__ == "__main__":
+    unittest.main()
