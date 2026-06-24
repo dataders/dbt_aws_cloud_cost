@@ -412,6 +412,11 @@ def redact(text: str, env: dict[str, str]) -> str:
         r"\1<redacted:x-amz-security-token>\2",
         redacted,
     )
+    redacted = re.sub(
+        r"(x-amz-security-token=')[^'\s]+",
+        r"\1<redacted:x-amz-security-token>",
+        redacted,
+    )
     redacted = re.sub(r"(X-Amz-Credential=)[^&\s']+", r"\1<redacted>", redacted)
     redacted = re.sub(r"(X-Amz-Signature=)[A-Fa-f0-9]+", r"\1<redacted>", redacted)
     redacted = re.sub(r"(X-Amz-Security-Token=)[^&\s']+", r"\1<redacted>", redacted)
@@ -499,6 +504,10 @@ def write_redacted(path: Path, text: str, env: dict[str, str]) -> None:
     path.write_text(redact(text, env))
 
 
+def redacted_error(output: str, env: dict[str, str]) -> str:
+    return redact(first_error(output), env)
+
+
 def csv_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     flattened = []
     for row in rows:
@@ -573,7 +582,7 @@ def run_one(
         "repetition": repetition,
         "passed": result.returncode == 0,
         "exit_code": result.returncode,
-        "error": "" if result.returncode == 0 else first_error(result.stdout),
+        "error": "" if result.returncode == 0 else redacted_error(result.stdout, env),
         "timings": timings,
         **http_summary,
     }

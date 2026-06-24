@@ -158,6 +158,23 @@ class CatalogBenchmarkTest(unittest.TestCase):
         self.assertNotIn("bad-query-token", redacted)
         self.assertIn("client-id-is-not-secret", redacted)
 
+    def test_summary_error_redacts_http_debug_secrets(self):
+        output = (
+            "noise before failure\n"
+            "{'request': {'headers': {Authorization='AWS4-HMAC-SHA256 "
+            "Credential=AKIA/20260624/us-east-1/s3/aws4_request, "
+            "SignedHeaders=host, Signature=deadbeef', "
+            "x-amz-security-token='bad-session-token "
+            "TransactionContext Error: Failed to commit\n"
+        )
+
+        error = self.bench.redacted_error(output, {})
+
+        self.assertNotIn("AKIA", error)
+        self.assertNotIn("deadbeef", error)
+        self.assertNotIn("bad-session-token", error)
+        self.assertNotIn("AWS4-HMAC-SHA256 Credential", error)
+
 
 if __name__ == "__main__":
     unittest.main()
