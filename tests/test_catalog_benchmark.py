@@ -14,6 +14,7 @@ MODULE_PATH = ROOT / "scripts" / "catalog_benchmark.py"
 
 def load_module():
     spec = importlib.util.spec_from_file_location("catalog_benchmark", MODULE_PATH)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -27,7 +28,9 @@ class CatalogBenchmarkTest(unittest.TestCase):
 
     def test_size_matrix_supports_named_defaults_and_explicit_rows(self):
         named = self.bench.parse_size_matrix("tiny,medium", None)
-        self.assertEqual([(size.label, size.rows) for size in named], [("tiny", 4), ("medium", 1_000_000)])
+        self.assertEqual(
+            [(size.label, size.rows) for size in named], [("tiny", 4), ("medium", 1_000_000)]
+        )
 
         explicit = self.bench.parse_size_matrix(None, "7,42")
         self.assertEqual(
@@ -59,7 +62,12 @@ class CatalogBenchmarkTest(unittest.TestCase):
         missing = self.bench.missing_env(target, {"HORIZON_ENDPOINT": "https://example"})
         self.assertEqual(
             missing,
-            ["HORIZON_WAREHOUSE", "HORIZON_ACCESS_TOKEN", "HORIZON_SCHEMA", "SNOWFLAKE_DEFAULT_REGION"],
+            [
+                "HORIZON_WAREHOUSE",
+                "HORIZON_ACCESS_TOKEN",
+                "HORIZON_SCHEMA",
+                "SNOWFLAKE_DEFAULT_REGION",
+            ],
         )
 
     def test_horizon_sql_uses_secret_name_and_legacy_options(self):
@@ -73,7 +81,9 @@ class CatalogBenchmarkTest(unittest.TestCase):
         target = self.bench.load_targets(env)["horizon"]
 
         secret_sql = self.bench.render_secret_sql(target, env)
-        attach_sql = self.bench.render_attach_sql(target, env, self.bench.ATTACH_VARIANTS["legacy_full_compat"])
+        attach_sql = self.bench.render_attach_sql(
+            target, env, self.bench.ATTACH_VARIANTS["legacy_full_compat"]
+        )
 
         self.assertIn("CREATE OR REPLACE SECRET snowflake_oauth", secret_sql)
         self.assertIn("TOKEN 'super-secret-token'", secret_sql)
@@ -87,12 +97,16 @@ class CatalogBenchmarkTest(unittest.TestCase):
     def test_workload_sql_varies_table_name_and_row_count(self):
         target = self.bench.load_targets()["lakekeeper_local"]
         size = self.bench.BenchmarkSize("small", 10_000)
-        sql = self.bench.render_workload_sql(target, "legacy_full_compat", size, repetition=2, keep_tables=False)
+        sql = self.bench.render_workload_sql(
+            target, "legacy_full_compat", size, repetition=2, keep_tables=False
+        )
 
         self.assertIn("bench_legacy_full_compat_small_r2", sql)
         self.assertIn("FROM range(10000)", sql)
         self.assertIn("SELECT count(*) AS row_count", sql)
-        self.assertIn("DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql)
+        self.assertIn(
+            "DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql
+        )
 
     def test_redaction_removes_known_secret_values_and_bearer_headers(self):
         env = {
@@ -100,7 +114,12 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "POLARIS_SECRET": "polaris-secret",
             "POLARIS_ID": "client-id-is-not-secret",
         }
-        text = "TOKEN 'super-secret-token'\nAuthorization=Bearer abc.def\nclient_secret=polaris-secret\nid=client-id-is-not-secret"
+        text = (
+            "TOKEN 'super-secret-token'\n"
+            "Authorization=Bearer abc.def\n"
+            "client_secret=polaris-secret\n"
+            "id=client-id-is-not-secret"
+        )
 
         redacted = self.bench.redact(text, env)
 

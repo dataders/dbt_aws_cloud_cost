@@ -188,3 +188,19 @@ Each target directory contains:
 The summary includes target, variant, size, row count, repetition, phase timing,
 HTTP request count, summed HTTP duration, grouped HTTP timings, and error text
 for failing variants.
+
+## Python Quality Gates
+
+Run these after touching the benchmark runner or tests:
+
+```bash
+uv run --group dev ruff format --check --no-cache scripts/catalog_benchmark.py tests/test_catalog_benchmark.py
+uv run --group dev ruff check --no-cache scripts/catalog_benchmark.py tests/test_catalog_benchmark.py
+uv run --group dev ty check scripts/catalog_benchmark.py tests/test_catalog_benchmark.py
+```
+
+Use Ruff to apply formatting:
+
+```bash
+uv run --group dev ruff format scripts/catalog_benchmark.py tests/test_catalog_benchmark.py
+```

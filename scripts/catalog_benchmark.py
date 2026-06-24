@@ -14,7 +14,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 import time
 import tomllib
 from dataclasses import dataclass
@@ -82,7 +81,9 @@ ATTACH_VARIANTS = {
         "skip_create_metadata_updates",
         {"STAGE_CREATE_TABLES": "false", "SKIP_CREATE_TABLE_METADATA_UPDATES": "true"},
     ),
-    "no_cleanup_on_rollback": AttachVariant("no_cleanup_on_rollback", {"REMOVE_FILES_ON_DELETE": "false"}),
+    "no_cleanup_on_rollback": AttachVariant(
+        "no_cleanup_on_rollback", {"REMOVE_FILES_ON_DELETE": "false"}
+    ),
     "legacy_full_compat": AttachVariant(
         "legacy_full_compat",
         {
@@ -252,7 +253,8 @@ def render_secret_sql(target: CatalogTarget, env: dict[str, str]) -> str:
     if target.oauth_secret:
         secret = target.oauth_secret
         statements.append(
-            "CREATE OR REPLACE SECRET {name} (TYPE ICEBERG, CLIENT_ID {client_id}, CLIENT_SECRET {client_secret}, "
+            "CREATE OR REPLACE SECRET {name} "
+            "(TYPE ICEBERG, CLIENT_ID {client_id}, CLIENT_SECRET {client_secret}, "
             "OAUTH2_SERVER_URI {oauth2_server_uri}, OAUTH2_SCOPE {oauth2_scope}, "
             "OAUTH2_GRANT_TYPE {oauth2_grant_type});".format(
                 name=secret["name"],
@@ -260,7 +262,9 @@ def render_secret_sql(target: CatalogTarget, env: dict[str, str]) -> str:
                 client_secret=sql_literal(secret["client_secret"]),
                 oauth2_server_uri=sql_literal(secret["oauth2_server_uri"]),
                 oauth2_scope=sql_literal(secret.get("oauth2_scope", "PRINCIPAL_ROLE:ALL")),
-                oauth2_grant_type=sql_literal(secret.get("oauth2_grant_type", "client_credentials")),
+                oauth2_grant_type=sql_literal(
+                    secret.get("oauth2_grant_type", "client_credentials")
+                ),
             )
         )
     if not statements:
@@ -298,13 +302,21 @@ def render_attach_sql(target: CatalogTarget, env: dict[str, str], variant: Attac
     return f"ATTACH {sql_literal(target.warehouse)} AS {target.attach_as} (\n{rendered_options}\n);"
 
 
-def relation_name(target: CatalogTarget, variant_name: str, size: BenchmarkSize, repetition: int) -> str:
+def relation_name(
+    target: CatalogTarget, variant_name: str, size: BenchmarkSize, repetition: int
+) -> str:
     table = f"bench_{variant_name}_{size.label}_r{repetition}".lower()
     table = re.sub(r"[^a-z0-9_]", "_", table)
     return f"{target.attach_as}.{target.default_schema}.{table}"
 
 
-def render_workload_sql(target: CatalogTarget, variant_name: str, size: BenchmarkSize, repetition: int, keep_tables: bool) -> str:
+def render_workload_sql(
+    target: CatalogTarget,
+    variant_name: str,
+    size: BenchmarkSize,
+    repetition: int,
+    keep_tables: bool,
+) -> str:
     relation = relation_name(target, variant_name, size, repetition)
     lines = []
     if target.create_schema:
@@ -361,7 +373,9 @@ def render_run_sql(
     http_log_path = output_dir / f"http_{target.name}_{variant.name}_{size.label}_r{repetition}.csv"
     profile_sql = ""
     if profile:
-        profile_path = output_dir / f"profile_{target.name}_{variant.name}_{size.label}_r{repetition}.json"
+        profile_path = (
+            output_dir / f"profile_{target.name}_{variant.name}_{size.label}_r{repetition}.json"
+        )
         profile_sql = "\n".join(
             [
                 "PRAGMA enable_profiling='json';",
@@ -453,7 +467,9 @@ def summarize_http_log(path: Path) -> dict[str, Any]:
     return {"http_request_count": count, "http_duration_ms": total, "http_groups": groups}
 
 
-def run_duckdb(duckdb: Path, sql_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_duckdb(
+    duckdb: Path, sql_path: Path, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [str(duckdb), ":memory:"],
         input=sql_path.read_text(),
@@ -509,7 +525,16 @@ def run_one(
 ) -> dict[str, Any]:
     duckdb = duckdb_cli(env)
     sql, http_log_path = render_run_sql(
-        target, env, variant, size, repetition, output_dir, threads, memory_limit, keep_tables, profile
+        target,
+        env,
+        variant,
+        size,
+        repetition,
+        output_dir,
+        threads,
+        memory_limit,
+        keep_tables,
+        profile,
     )
     stem = f"{target.name}_{variant.name}_{size.label}_r{repetition}"
     sql_path = output_dir / f"{stem}.sql"
@@ -558,17 +583,27 @@ def choose_minimal_passing(rows: list[dict[str, Any]]) -> AttachVariant | None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", required=False, help="Target name from benchmarks/catalog_benchmarks.toml")
-    parser.add_argument("--list-targets", action="store_true", help="List configured targets and exit")
+    parser.add_argument(
+        "--target", required=False, help="Target name from benchmarks/catalog_benchmarks.toml"
+    )
+    parser.add_argument(
+        "--list-targets", action="store_true", help="List configured targets and exit"
+    )
     parser.add_argument("--sizes", default="tiny,small", help="Comma-separated named sizes")
     parser.add_argument("--rows", help="Comma-separated explicit row counts; overrides --sizes")
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--memory-limit", default="4GB")
     parser.add_argument("--keep-tables", action="store_true")
-    parser.add_argument("--compat-only", action="store_true", help="Only run attach-option ablation variants")
-    parser.add_argument("--profile", action="store_true", help="Enable DuckDB JSON profiling for the run")
-    parser.add_argument("--variants", help="Comma-separated variant names; defaults to the ablation suite")
+    parser.add_argument(
+        "--compat-only", action="store_true", help="Only run attach-option ablation variants"
+    )
+    parser.add_argument(
+        "--profile", action="store_true", help="Enable DuckDB JSON profiling for the run"
+    )
+    parser.add_argument(
+        "--variants", help="Comma-separated variant names; defaults to the ablation suite"
+    )
     parser.add_argument("--run-id", help="Stable output directory suffix")
     return parser
 
@@ -593,11 +628,17 @@ def main(argv: list[str] | None = None) -> int:
     if missing:
         raise SystemExit(f"missing required env vars for {target.name}: {', '.join(missing)}")
 
-    variant_names = [name.strip() for name in args.variants.split(",")] if args.variants else list(ATTACH_VARIANTS)
+    variant_names = (
+        [name.strip() for name in args.variants.split(",")]
+        if args.variants
+        else list(ATTACH_VARIANTS)
+    )
     variants = []
     for name in variant_names:
         if name not in ATTACH_VARIANTS:
-            raise SystemExit(f"unknown variant {name!r}; valid variants: {', '.join(ATTACH_VARIANTS)}")
+            raise SystemExit(
+                f"unknown variant {name!r}; valid variants: {', '.join(ATTACH_VARIANTS)}"
+            )
         variants.append(ATTACH_VARIANTS[name])
 
     run_id = args.run_id or time.strftime("%Y%m%dT%H%M%S")
