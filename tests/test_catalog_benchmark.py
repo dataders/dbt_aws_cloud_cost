@@ -108,7 +108,7 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql
         )
 
-    def test_run_sql_loads_iceberg_extension_after_disabling_autoload(self):
+    def test_run_sql_loads_required_extensions_after_disabling_autoload(self):
         target = self.bench.load_targets()["lakekeeper_local"]
         sql, _ = self.bench.render_run_sql(
             target=target,
@@ -122,7 +122,10 @@ class CatalogBenchmarkTest(unittest.TestCase):
             keep_tables=False,
         )
 
-        self.assertIn("SET autoload_known_extensions=false;\nLOAD iceberg;", sql)
+        self.assertIn(
+            "SET autoload_known_extensions=false;\nLOAD iceberg;\nLOAD httpfs;",
+            sql,
+        )
 
     def test_redaction_removes_known_secret_values_and_bearer_headers(self):
         env = {
