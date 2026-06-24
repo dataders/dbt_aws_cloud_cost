@@ -46,10 +46,18 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "no_multi_commit",
             "skip_create_metadata_updates",
             "no_cleanup_on_rollback",
+            "legacy_without_stage_create",
             "legacy_full_compat",
         ]:
             with self.subTest(name=name):
                 self.assertIn(name, variants)
+
+        no_stage_options = variants["legacy_without_stage_create"].options
+        self.assertEqual(no_stage_options["DISABLE_MULTI_TABLE_COMMIT"], "true")
+        self.assertEqual(no_stage_options["SKIP_CREATE_TABLE_METADATA_UPDATES"], "true")
+        self.assertEqual(no_stage_options["REMOVE_FILES_ON_DELETE"], "false")
+        self.assertNotIn("STAGE_CREATE_TABLES", no_stage_options)
+        self.assertNotIn("READ_ONLY", no_stage_options)
 
         legacy_options = variants["legacy_full_compat"].options
         self.assertEqual(legacy_options["STAGE_CREATE_TABLES"], "false")

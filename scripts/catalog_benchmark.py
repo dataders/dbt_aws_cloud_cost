@@ -84,6 +84,14 @@ ATTACH_VARIANTS = {
     "no_cleanup_on_rollback": AttachVariant(
         "no_cleanup_on_rollback", {"REMOVE_FILES_ON_DELETE": "false"}
     ),
+    "legacy_without_stage_create": AttachVariant(
+        "legacy_without_stage_create",
+        {
+            "DISABLE_MULTI_TABLE_COMMIT": "true",
+            "SKIP_CREATE_TABLE_METADATA_UPDATES": "true",
+            "REMOVE_FILES_ON_DELETE": "false",
+        },
+    ),
     "legacy_full_compat": AttachVariant(
         "legacy_full_compat",
         {
