@@ -89,6 +89,10 @@ class CatalogBenchmarkTest(unittest.TestCase):
     def test_target_default_variants_lock_simplest_working_configs(self):
         targets = self.bench.load_targets(
             {
+                "LAKEKEEPER_S3_KEY_ID": "fake-lakekeeper-key",
+                "LAKEKEEPER_S3_SECRET": "fake-lakekeeper-secret",
+                "POLARIS_LOCAL_ID": "fake-local-polaris-id",
+                "POLARIS_LOCAL_SECRET": "fake-local-polaris-secret",
                 "POLARIS_URL": "https://polaris.example",
                 "POLARIS_WAREHOUSE": "warehouse",
                 "POLARIS_ID": "client-id",
@@ -154,10 +158,14 @@ class CatalogBenchmarkTest(unittest.TestCase):
         )
 
     def test_run_sql_loads_required_extensions_after_disabling_autoload(self):
-        target = self.bench.load_targets()["lakekeeper_local"]
+        env = {
+            "LAKEKEEPER_S3_KEY_ID": "fake-lakekeeper-key",
+            "LAKEKEEPER_S3_SECRET": "fake-lakekeeper-secret",
+        }
+        target = self.bench.load_targets(env)["lakekeeper_local"]
         sql, _ = self.bench.render_run_sql(
             target=target,
-            env={},
+            env=env,
             variant=self.bench.ATTACH_VARIANTS["default"],
             size=self.bench.BenchmarkSize("tiny", 4),
             repetition=1,

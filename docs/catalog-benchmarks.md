@@ -38,6 +38,13 @@ Start the existing repo stack:
 docker compose up -d
 ```
 
+Required env vars:
+
+```bash
+LAKEKEEPER_S3_KEY_ID=...
+LAKEKEEPER_S3_SECRET=...
+```
+
 Run a small benchmark:
 
 ```bash
@@ -59,6 +66,13 @@ Start it:
 
 ```bash
 scripts/start_local_polaris.sh
+```
+
+Required env vars:
+
+```bash
+POLARIS_LOCAL_ID=...
+POLARIS_LOCAL_SECRET=...
 ```
 
 Run:

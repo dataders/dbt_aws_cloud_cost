@@ -31,8 +31,10 @@ Polaris quickstart stack requested.
 Benchmark target defaults:
   endpoint:  http://localhost:8181/api/catalog
   warehouse: quickstart_catalog
-  client id: root
-  secret:    s3cr3t
+
+Required benchmark env:
+  POLARIS_LOCAL_ID
+  POLARIS_LOCAL_SECRET
 
 Run:
   uv run scripts/catalog_benchmark.py --target polaris_local --sizes tiny,small

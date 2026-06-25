@@ -8,11 +8,12 @@ default_schema = "default"
 authorization_type = "NONE"
 access_delegation_mode = "NONE"
 create_schema = true
+required_env = ["LAKEKEEPER_S3_KEY_ID", "LAKEKEEPER_S3_SECRET"]
 
 [targets.lakekeeper_local.s3_secret]
 name = "minio_secret"
-key_id = "minio-root-user"
-secret = "minio-root-password"
+key_id = "${LAKEKEEPER_S3_KEY_ID}"
+secret = "${LAKEKEEPER_S3_SECRET}"
 endpoint = "localhost:19000"
 url_style = "path"
 use_ssl = false
@@ -28,11 +29,12 @@ authorization_type = "OAUTH2"
 access_delegation_mode = "VENDED_CREDENTIALS"
 default_region = "us-west-2"
 create_schema = true
+required_env = ["POLARIS_LOCAL_ID", "POLARIS_LOCAL_SECRET"]
 
 [targets.polaris_local.oauth_secret]
 name = "polaris_oauth"
-client_id = "${POLARIS_LOCAL_ID:-root}"
-client_secret = "${POLARIS_LOCAL_SECRET:-s3cr3t}"
+client_id = "${POLARIS_LOCAL_ID}"
+client_secret = "${POLARIS_LOCAL_SECRET}"
 oauth2_server_uri = "${POLARIS_LOCAL_OAUTH_TOKEN_URI:-http://localhost:8181/api/catalog/v1/oauth/tokens}"
 oauth2_scope = "PRINCIPAL_ROLE:ALL"
 oauth2_grant_type = "client_credentials"
