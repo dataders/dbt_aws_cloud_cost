@@ -199,6 +199,15 @@ The summary includes target, variant, size, row count, repetition, phase timing,
 HTTP request count, summed HTTP duration, grouped HTTP timings, and error text
 for failing variants.
 
+The workload phases are:
+
+- create table
+- insert generated rows
+- read back row-count checks
+- delete even ids with `DELETE FROM ... WHERE id % 2 = 0`
+- read back post-delete verification
+- drop table cleanup
+
 ## Python Quality Gates
 
 Run these after touching the benchmark runner or tests:

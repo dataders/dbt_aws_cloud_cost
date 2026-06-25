@@ -337,6 +337,8 @@ def render_workload_sql(
     keep_tables: bool,
 ) -> str:
     relation = relation_name(target, variant_name, size, repetition)
+    expected_remaining_count = size.rows // 2
+    expected_remaining_sum = expected_remaining_count**2
     lines = []
     if target.create_schema:
         lines.extend(
@@ -362,6 +364,22 @@ def render_workload_sql(
             f".print >>> PHASE: readback {size.label} rep {repetition}",
             "SELECT count(*) AS row_count, sum(id) AS id_sum,",
             "       count(*) FILTER (WHERE id % 10 = 0) AS decile_rows",
+            f"FROM {relation};",
+            "",
+            f".print >>> PHASE: delete {size.label} rep {repetition}",
+            f"DELETE FROM {relation} WHERE id % 2 = 0;",
+            "",
+            f".print >>> PHASE: read_after_delete {size.label} rep {repetition}",
+            "SELECT",
+            "  CASE",
+            f"    WHEN count(*) = {expected_remaining_count}",
+            f"     AND COALESCE(sum(id), 0) = {expected_remaining_sum}",
+            "     AND count(*) FILTER (WHERE id % 2 = 0) = 0",
+            "    THEN count(*)",
+            "    ELSE error('delete verification failed')",
+            "  END AS remaining_rows,",
+            "  COALESCE(sum(id), 0) AS remaining_id_sum,",
+            "  count(*) FILTER (WHERE id % 2 = 0) AS even_rows_remaining",
             f"FROM {relation};",
             "",
         ]
@@ -439,6 +457,7 @@ def redact(text: str, env: dict[str, str]) -> str:
     redacted = re.sub(r"(X-Amz-Credential=)[^&\s']+", r"\1<redacted>", redacted)
     redacted = re.sub(r"(X-Amz-Signature=)[A-Fa-f0-9]+", r"\1<redacted>", redacted)
     redacted = re.sub(r"(X-Amz-Security-Token=)[^&\s']+", r"\1<redacted>", redacted)
+    redacted = re.sub(r"(x-amz-id-2=)[^,}\s]+", r"\1<redacted:x-amz-id-2>", redacted)
     redacted = re.sub(r"Bearer\s+[A-Za-z0-9._~+/=-]+", "Bearer <redacted>", redacted)
     redacted = re.sub(r"(client_secret=)[^&\s']+", r"\1<redacted>", redacted)
     return redacted

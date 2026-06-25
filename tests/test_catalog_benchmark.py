@@ -143,6 +143,12 @@ class CatalogBenchmarkTest(unittest.TestCase):
         self.assertIn("bench_legacy_full_compat_small_r2", sql)
         self.assertIn("FROM range(10000)", sql)
         self.assertIn("SELECT count(*) AS row_count", sql)
+        self.assertIn("DELETE FROM lakekeeper.default.bench_legacy_full_compat_small_r2", sql)
+        self.assertIn("WHERE id % 2 = 0", sql)
+        self.assertIn("read_after_delete small rep 2", sql)
+        self.assertIn("count(*) = 5000", sql)
+        self.assertIn("COALESCE(sum(id), 0) = 25000000", sql)
+        self.assertIn("error('delete verification failed')", sql)
         self.assertIn(
             "DROP TABLE IF EXISTS lakekeeper.default.bench_legacy_full_compat_small_r2", sql
         )
@@ -181,6 +187,7 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "Authorization=Bearer abc.def\n"
             "client_secret=polaris-secret\n"
             "x-amz-security-token='bad-session-token'\n"
+            "x-amz-id-2=response-id-that-looks-like-ASIA-token\n"
             "https://example.com/path?X-Amz-Credential=AKIA%2F20260624&X-Amz-Signature=deadbeef&X-Amz-Security-Token=bad-query-token\n"
             "id=client-id-is-not-secret"
         )
@@ -193,6 +200,7 @@ class CatalogBenchmarkTest(unittest.TestCase):
         self.assertNotIn("AWS4-HMAC-SHA256 Credential=AKIA", redacted)
         self.assertNotIn("Bearer abc.def", redacted)
         self.assertNotIn("bad-session-token", redacted)
+        self.assertNotIn("response-id-that-looks-like-ASIA-token", redacted)
         self.assertNotIn("deadbeef", redacted)
         self.assertNotIn("bad-query-token", redacted)
         self.assertIn("client-id-is-not-secret", redacted)
