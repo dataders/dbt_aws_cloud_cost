@@ -59,6 +59,7 @@ class AttachVariant:
 class CatalogTarget:
     name: str
     description: str
+    default_variant: str
     attach_as: str
     warehouse: str
     endpoint: str
@@ -80,6 +81,14 @@ ATTACH_VARIANTS = {
     "skip_create_metadata_updates": AttachVariant(
         "skip_create_metadata_updates",
         {"STAGE_CREATE_TABLES": "false", "SKIP_CREATE_TABLE_METADATA_UPDATES": "true"},
+    ),
+    "stage_multi_metadata": AttachVariant(
+        "stage_multi_metadata",
+        {
+            "STAGE_CREATE_TABLES": "false",
+            "DISABLE_MULTI_TABLE_COMMIT": "true",
+            "SKIP_CREATE_TABLE_METADATA_UPDATES": "true",
+        },
     ),
     "no_cleanup_on_rollback": AttachVariant(
         "no_cleanup_on_rollback", {"REMOVE_FILES_ON_DELETE": "false"}
@@ -155,6 +164,7 @@ def load_targets(env: dict[str, str] | None = None) -> dict[str, CatalogTarget]:
         targets[name] = CatalogTarget(
             name=name,
             description=str(resolved.get("description", "")),
+            default_variant=str(resolved.get("default_variant", "default")),
             attach_as=str(resolved["attach_as"]),
             warehouse=str(resolved["warehouse"]),
             endpoint=str(resolved["endpoint"]),
@@ -174,6 +184,7 @@ def load_targets(env: dict[str, str] | None = None) -> dict[str, CatalogTarget]:
             targets[name] = CatalogTarget(
                 name=targets[name].name,
                 description=targets[name].description,
+                default_variant=targets[name].default_variant,
                 attach_as=targets[name].attach_as,
                 warehouse=targets[name].warehouse,
                 endpoint=targets[name].endpoint,
@@ -630,6 +641,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--compat-only", action="store_true", help="Only run attach-option ablation variants"
     )
     parser.add_argument(
+        "--locked-config",
+        action="store_true",
+        help="Run only the target default_variant across the requested size matrix",
+    )
+    parser.add_argument(
         "--profile", action="store_true", help="Enable DuckDB JSON profiling for the run"
     )
     parser.add_argument(
@@ -658,6 +674,8 @@ def main(argv: list[str] | None = None) -> int:
     missing = missing_env(target, env)
     if missing:
         raise SystemExit(f"missing required env vars for {target.name}: {', '.join(missing)}")
+    if args.locked_config and (args.compat_only or args.variants):
+        raise SystemExit("--locked-config cannot be combined with --compat-only or --variants")
 
     variant_names = (
         [name.strip() for name in args.variants.split(",")]
@@ -677,6 +695,33 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, Any]] = []
+    if args.locked_config:
+        if target.default_variant not in ATTACH_VARIANTS:
+            raise SystemExit(
+                f"target {target.name!r} default_variant {target.default_variant!r} "
+                f"is not valid; valid variants: {', '.join(ATTACH_VARIANTS)}"
+            )
+        variant = ATTACH_VARIANTS[target.default_variant]
+        for size in parse_size_matrix(args.sizes, args.rows):
+            for repetition in range(1, args.repetitions + 1):
+                rows.append(
+                    run_one(
+                        target,
+                        env,
+                        variant,
+                        size,
+                        repetition,
+                        output_dir,
+                        args.threads,
+                        args.memory_limit,
+                        args.keep_tables,
+                        args.profile,
+                    )
+                )
+        write_summary(rows, output_dir)
+        print(output_dir)
+        return 0 if all(row["passed"] for row in rows) else 1
+
     tiny = BenchmarkSize("tiny", DEFAULT_SIZES["tiny"])
     for variant in variants:
         rows.append(

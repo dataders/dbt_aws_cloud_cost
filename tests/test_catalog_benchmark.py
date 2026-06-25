@@ -45,12 +45,20 @@ class CatalogBenchmarkTest(unittest.TestCase):
             "no_stage_create",
             "no_multi_commit",
             "skip_create_metadata_updates",
+            "stage_multi_metadata",
             "no_cleanup_on_rollback",
             "legacy_without_stage_create",
             "legacy_full_compat",
         ]:
             with self.subTest(name=name):
                 self.assertIn(name, variants)
+
+        stage_multi_metadata = variants["stage_multi_metadata"].options
+        self.assertEqual(stage_multi_metadata["STAGE_CREATE_TABLES"], "false")
+        self.assertEqual(stage_multi_metadata["DISABLE_MULTI_TABLE_COMMIT"], "true")
+        self.assertEqual(stage_multi_metadata["SKIP_CREATE_TABLE_METADATA_UPDATES"], "true")
+        self.assertNotIn("REMOVE_FILES_ON_DELETE", stage_multi_metadata)
+        self.assertNotIn("READ_ONLY", stage_multi_metadata)
 
         no_stage_options = variants["legacy_without_stage_create"].options
         self.assertEqual(no_stage_options["DISABLE_MULTI_TABLE_COMMIT"], "true")
@@ -77,6 +85,29 @@ class CatalogBenchmarkTest(unittest.TestCase):
                 "SNOWFLAKE_DEFAULT_REGION",
             ],
         )
+
+    def test_target_default_variants_lock_simplest_working_configs(self):
+        targets = self.bench.load_targets(
+            {
+                "POLARIS_URL": "https://polaris.example",
+                "POLARIS_WAREHOUSE": "warehouse",
+                "POLARIS_ID": "client-id",
+                "POLARIS_SECRET": "secret",
+                "POLARIS_OAUTH_TOKEN_URI": "https://polaris.example/v1/oauth/tokens",
+                "HORIZON_ENDPOINT": "https://acct.snowflakecomputing.com/polaris/api/catalog",
+                "HORIZON_WAREHOUSE": "warehouse",
+                "HORIZON_ACCESS_TOKEN": "token",
+                "HORIZON_SCHEMA": "AWS_CLOUD_COST",
+                "SNOWFLAKE_DEFAULT_REGION": "us-east-1",
+            }
+        )
+
+        self.assertEqual(targets["lakekeeper_local"].default_variant, "default")
+        self.assertEqual(targets["polaris_local"].default_variant, "default")
+        self.assertEqual(targets["polaris_remote"].default_variant, "default")
+        self.assertEqual(targets["horizon"].default_variant, "stage_multi_metadata")
+        for target in targets.values():
+            self.assertIn(target.default_variant, self.bench.ATTACH_VARIANTS)
 
     def test_horizon_sql_uses_secret_name_and_legacy_options(self):
         env = {

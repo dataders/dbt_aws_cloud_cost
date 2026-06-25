@@ -148,7 +148,9 @@ Every run first tries these tiny-table attach variants:
 - `no_stage_create`
 - `no_multi_commit`
 - `skip_create_metadata_updates`
+- `stage_multi_metadata`
 - `no_cleanup_on_rollback`
+- `legacy_without_stage_create`
 - `legacy_full_compat`
 
 The runner records pass/fail and error text per variant, then uses the smallest
@@ -156,6 +158,14 @@ passing option set as `minimal_passing` for the larger data-size matrix.
 
 This is the piece that answers whether Horizon still needs
 `STAGE_CREATE_TABLES false` after duckdb-iceberg PR #1017.
+
+For repeatable benchmark runs after the ablation is known, each target has a
+`default_variant` in `benchmarks/catalog_benchmarks.toml`. Run only that locked
+configuration across the requested sizes:
+
+```bash
+uv run scripts/catalog_benchmark.py --target horizon --locked-config --sizes tiny,small,medium
+```
 
 Run only the compatibility matrix:
 
