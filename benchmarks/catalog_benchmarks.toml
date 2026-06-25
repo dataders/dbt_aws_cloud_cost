@@ -1,0 +1,78 @@
+[targets.lakekeeper_local]
+description = "Local Lakekeeper REST catalog backed by the repo docker-compose MinIO service."
+default_variant = "default"
+attach_as = "lakekeeper"
+warehouse = "demo"
+endpoint = "http://localhost:18181/catalog"
+default_schema = "default"
+authorization_type = "NONE"
+access_delegation_mode = "NONE"
+create_schema = true
+required_env = ["LAKEKEEPER_S3_KEY_ID", "LAKEKEEPER_S3_SECRET"]
+
+[targets.lakekeeper_local.s3_secret]
+name = "minio_secret"
+key_id = "${LAKEKEEPER_S3_KEY_ID}"
+secret = "${LAKEKEEPER_S3_SECRET}"
+endpoint = "localhost:19000"
+url_style = "path"
+use_ssl = false
+
+[targets.polaris_local]
+description = "Apache Polaris quickstart REST catalog backed by local RustFS."
+default_variant = "default"
+attach_as = "polaris"
+warehouse = "quickstart_catalog"
+endpoint = "http://localhost:8181/api/catalog"
+default_schema = "aws_cloud_cost"
+authorization_type = "OAUTH2"
+access_delegation_mode = "VENDED_CREDENTIALS"
+default_region = "us-west-2"
+create_schema = true
+required_env = ["POLARIS_LOCAL_ID", "POLARIS_LOCAL_SECRET"]
+
+[targets.polaris_local.oauth_secret]
+name = "polaris_oauth"
+client_id = "${POLARIS_LOCAL_ID}"
+client_secret = "${POLARIS_LOCAL_SECRET}"
+oauth2_server_uri = "${POLARIS_LOCAL_OAUTH_TOKEN_URI:-http://localhost:8181/api/catalog/v1/oauth/tokens}"
+oauth2_scope = "PRINCIPAL_ROLE:ALL"
+oauth2_grant_type = "client_credentials"
+
+[targets.polaris_remote]
+description = "Remote Polaris-compatible Iceberg REST catalog."
+default_variant = "default"
+attach_as = "polaris"
+warehouse = "${POLARIS_WAREHOUSE}"
+endpoint = "${POLARIS_URL}"
+default_schema = "aws_cloud_cost"
+authorization_type = "OAUTH2"
+access_delegation_mode = "VENDED_CREDENTIALS"
+default_region = "${POLARIS_DEFAULT_REGION:-us-east-1}"
+create_schema = true
+required_env = ["POLARIS_URL", "POLARIS_WAREHOUSE", "POLARIS_ID", "POLARIS_SECRET"]
+
+[targets.polaris_remote.oauth_secret]
+name = "polaris_oauth"
+client_id = "${POLARIS_ID}"
+client_secret = "${POLARIS_SECRET}"
+oauth2_server_uri = "${POLARIS_OAUTH_TOKEN_URI}"
+oauth2_scope = "${POLARIS_OAUTH_SCOPE:-PRINCIPAL_ROLE:ALL}"
+oauth2_grant_type = "client_credentials"
+
+[targets.horizon]
+description = "Snowflake Horizon REST catalog."
+default_variant = "stage_multi_metadata"
+attach_as = "horizon"
+warehouse = "${HORIZON_WAREHOUSE}"
+endpoint = "${HORIZON_ENDPOINT}"
+default_schema = "${HORIZON_SCHEMA}"
+authorization_type = "OAUTH2"
+access_delegation_mode = "VENDED_CREDENTIALS"
+default_region = "${SNOWFLAKE_DEFAULT_REGION}"
+create_schema = false
+required_env = ["HORIZON_ENDPOINT", "HORIZON_WAREHOUSE", "HORIZON_ACCESS_TOKEN", "HORIZON_SCHEMA", "SNOWFLAKE_DEFAULT_REGION"]
+
+[targets.horizon.token_secret]
+name = "snowflake_oauth"
+token = "${HORIZON_ACCESS_TOKEN}"
