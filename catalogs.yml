@@ -83,7 +83,7 @@ catalogs:
 #         warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
 #         secret: polaris_oauth
 #         authorization_type: "OAUTH2"
-#         access_delegation_mode: "VENDED_CREDENTIALS"
+#         access_delegation_mode: "{{ env_var('POLARIS_ACCESS_DELEGATION_MODE', 'VENDED_CREDENTIALS') }}"
 #         default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
 #         attach_as: "polaris"
 #         default_schema: "aws_cloud_cost"

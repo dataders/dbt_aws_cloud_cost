@@ -24,6 +24,14 @@ aws_cloud_cost:
         ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
         ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
 #         - type: iceberg
+        ## polaris — uncomment with the polaris catalog block
+        - type: iceberg
+          name: polaris_oauth
+          client_id: "{{ env_var('POLARIS_ID', '') }}"
+          client_secret: "{{ env_var('POLARIS_SECRET', '') }}"
+          oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
+          oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
+          oauth2_grant_type: "client_credentials"
 #           name: snowflake_oauth
 #           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
         ## unity (Databricks; read-write) — uncomment with the unity catalog block
@@ -38,14 +46,6 @@ aws_cloud_cost:
           endpoint: "localhost:19000"
           url_style: path
           use_ssl: false
-#         ## polaris — uncomment with the polaris catalog block
-#         - type: iceberg
-#           name: polaris_oauth
-#           client_id: "{{ env_var('POLARIS_ID', '') }}"
-#           client_secret: "{{ env_var('POLARIS_SECRET', '') }}"
-#           oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
-#           oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
-#           oauth2_grant_type: "client_credentials"
 #         ## r2 (Cloudflare R2 Data Catalog) — uncomment with the r2 catalog block
 #         - type: iceberg
 #           name: r2_token

@@ -135,7 +135,15 @@ class DemoConfigurationTest(unittest.TestCase):
         ]:
             with self.subTest(present=snippet):
                 self.assertIn(snippet, readme)
-        for gone in ["use_catalog.sh", "local_files", "shadowtraffic", "setup_env.sh"]:
+        # The demo runs on the published dbt Fusion CLI; no local build, no DBT_BIN.
+        for gone in [
+            "use_catalog.sh",
+            "local_files",
+            "shadowtraffic",
+            "setup_env.sh",
+            "DBT_BIN",
+            "cargo build",
+        ]:
             with self.subTest(absent=gone):
                 self.assertNotIn(gone, readme)
 

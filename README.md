@@ -12,8 +12,8 @@ this repo repurposes them to demonstrate catalogs v2.
 
 The default path (`ducklake`) runs with **zero credentials**.
 
-> Throughout, "dbt" means the locally built dbt Core v2 `dbt` binary
-> (see [Build the dbt binary](#build-the-dbt-binary))
+> Throughout, "dbt" means the dbt Fusion (dbt Core v2) `dbt` CLI —
+> see [Install dbt](#install-dbt)
 
 ## How it works
 
@@ -61,7 +61,7 @@ The default `ducklake` path needs **no credentials**.
 ### Prerequisites
 
 - macOS or Linux
-- A Rust toolchain (`cargo`) to build the one local `dbt` binary below
+- The dbt Fusion CLI (see [Install dbt](#install-dbt))
 - `docker` — only for the `lakekeeper` catalog
 - [`uv`](https://docs.astral.sh/uv/) — only for the optional Snowflake helper
   scripts (`scripts/*.sh`)
@@ -70,20 +70,18 @@ The default `ducklake` path needs **no credentials**.
 
 ### Steps
 
-1. **Build the local `dbt` binary** (not published anywhere) and note its path —
-   a Fusion `dbt` binary with catalogs v2 read-write. The DuckDB driver is the
-   official DuckDB 1.5.4 release, fetched from the dbt CDN — nothing else to
-   build. See [Build the dbt binary](#build-the-dbt-binary).
-2. **Write `.env`** by pointing `setup.sh` at that path:
+1. **Install dbt** — see [Install dbt](#install-dbt). Nothing to compile: the
+   DuckDB driver is the official DuckDB 1.5.4 release, fetched from the dbt CDN
+   on first run.
+2. **Write `.env`**:
    ```bash
-   DBT_BIN=/path/to/dbt-fusion/target/debug/dbt \
    scripts/setup.sh
    source .env                            # or: set -a && source .env && set +a
    ```
 3. **Run the demo** (builds into the zero-credential `ducklake` catalog):
    ```bash
-   "$DBT_BIN" seed                        # load the committed seed
-   "$DBT_BIN" run                         # build the models into ducklake
+   dbt seed                               # load the committed seed
+   dbt run                                # build the models into ducklake
    ```
 4. **Inspect the output** — see [Setup and run](#setup-and-run).
 5. **(optional) Try another catalog** — pick one of `lakekeeper` / `horizon` /
@@ -91,53 +89,49 @@ The default `ducklake` path needs **no credentials**.
    [Switching catalogs](#switching-catalogs). Verified writing: ducklake,
    lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
 
-## Build the dbt binary
+## Install dbt
 
-This demo depends on one locally built binary that is **not** published anywhere
-— a Fusion `dbt` binary with the **catalogs v2 read-write** work. The DuckDB
-driver itself is the **official DuckDB 1.5.4 release**, fetched automatically
-from the dbt CDN on first run; there is nothing else to build (no
-`duckdb-iceberg` checkout, no vcpkg, no `DISABLE_SANITIZER`).
-
-From a Fusion (`dbt-fusion`) checkout that includes catalogs v2 read-write —
-dbt-core [#15239](https://github.com/dbt-labs/dbt-core/pull/15239) ("catalogs.yml
-v2 part 2 — Horizon & Unity read-write", stacked on part 1
-[#15238](https://github.com/dbt-labs/dbt-core/pull/15238)). Until that ships in a
-published build, compile it from a branch that has it:
+Catalogs v2 read-write ships in the published dbt Fusion CLI, so there is
+nothing to build:
 
 ```bash
-cd /path/to/your/dbt-fusion    # e.g. ~/Developer/dbt-fusion, on the catalogs-v2 branch
-cargo build --bin dbt          # produces target/debug/dbt
+curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
+dbt --version          # verified on dbt-fusion 2.0.0-preview.193
+dbt system update      # later, to move to the newest release
 ```
 
-Then set `DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt`.
+`catalogs.yml` v2 is still experimental — `dbt` prints a schema-validation
+warning on every invocation and the spec can change (dbt-core
+[#12723](https://github.com/dbt-labs/dbt-core/discussions/12723)). The project
+opts in with `use_catalogs_v2: true` in `dbt_project.yml`.
 
-The write-compat attach options the v2 Horizon/Unity catalogs need (duckdb-iceberg
+The DuckDB driver is the **official DuckDB 1.5.4 release**, fetched
+automatically from the dbt CDN on first run. The write-compat attach options the
+v2 Horizon/Unity catalogs need (duckdb-iceberg
 [#1017](https://github.com/duckdb/duckdb-iceberg/pull/1017) /
 [#1018](https://github.com/duckdb/duckdb-iceberg/pull/1018) /
 [#1020](https://github.com/duckdb/duckdb-iceberg/pull/1020)) **shipped in DuckDB
-1.5.4**, so the official driver carries them. dbt downloads the signed `httpfs`,
+1.5.4**, so that driver carries them. dbt downloads the signed `httpfs`,
 `iceberg`, and `ducklake` extensions from the official extension repository on
 first use (`autoinstall_known_extensions` / `autoload_known_extensions` are
 enabled in `profiles.yml`).
 
 ## Setup and run
 
-From the repo root, point at your `dbt` binary and let `setup.sh` write `.env`:
+From the repo root:
 
 ```bash
-DBT_BIN=/path/to/your/dbt-fusion/target/debug/dbt \
 scripts/setup.sh
 
 set -a && source .env && set +a        # load it (or: direnv allow)
 
-"$DBT_BIN" seed                        # load the committed seed (built-in catalog)
-"$DBT_BIN" run                         # build the models into the ducklake catalog
+dbt seed                               # load the committed seed (built-in catalog)
+dbt run                                # build the models into the ducklake catalog
 ```
 
-`setup.sh` validates the binary and writes a credential-free `.env` (it won't
-overwrite an existing one). Prefer to fill it in by hand? Copy `.env.example` to
-`.env` and edit the `DBT_BIN` path instead — `setup.sh` is just a convenience.
+`setup.sh` checks that `dbt` is on your `PATH` and writes a credential-free
+`.env` (it won't overwrite an existing one). Prefer to do it by hand? Copy
+`.env.example` to `.env` — `setup.sh` is just a convenience.
 
 Inspect the result (any DuckLake-1.0-capable DuckDB CLI — e.g. `brew install duckdb`):
 
@@ -159,7 +153,7 @@ e.g. to `lakekeeper`:
 2. In `dbt_project.yml`: set `+catalog_name: lakekeeper`.
 3. For a credentialed catalog only: also uncomment its secret block in
    `profiles.yml` and supply its env vars (see below), then re-`source .env`.
-4. `"$DBT_BIN" run`.
+4. `dbt run`.
 
 `uv run tests/test_demo_configuration.py` enforces the one-active-catalog
 == `+catalog_name` invariant.
@@ -169,6 +163,18 @@ e.g. to `lakekeeper`:
 For any non-default catalog, copy the matching section from `.env.example` into
 `.env`, fill it in, then uncomment that catalog's block in `catalogs.yml` and its
 secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
+
+Prefer to keep credentials out of the repo entirely? With direnv, `.envrc` also
+sources a git-ignored `.envrc.private`, so a one-liner there can pull the same
+vars from wherever you keep secrets:
+
+```bash
+# .envrc.private
+source_env_if_exists "$HOME/my-private-env/dbt-aws-cloud-cost.envrc"
+```
+
+`.env` loads after it, so repo-local settings (and the session
+`HORIZON_ACCESS_TOKEN`) still win.
 
 The tables below list the permissions the catalog's principal needs to **write**
 from an external engine (reads need a subset). Privilege names follow each
