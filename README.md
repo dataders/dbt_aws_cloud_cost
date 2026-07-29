@@ -164,17 +164,20 @@ For any non-default catalog, copy the matching section from `.env.example` into
 `.env`, fill it in, then uncomment that catalog's block in `catalogs.yml` and its
 secret block in `profiles.yml`. `.env` is git-ignored — never commit it.
 
-Prefer to keep credentials out of the repo entirely? With direnv, `.envrc` also
-sources a git-ignored `.envrc.private`, so a one-liner there can pull the same
-vars from wherever you keep secrets:
+Prefer to keep credentials out of the repo entirely? `.envrc` first calls
+`source_dotfiles_env dbt-aws-cloud-cost` when your `~/.config/direnv/direnvrc`
+defines that helper, so the vars can come from a private overlay outside the
+repo:
 
 ```bash
-# .envrc.private
-source_env_if_exists "$HOME/my-private-env/dbt-aws-cloud-cost.envrc"
+# ~/.config/direnv/direnvrc
+source_dotfiles_env() {
+  source_env_if_exists "$HOME/my-private-env/projects/${1:-$(basename "$PWD")}.envrc"
+}
 ```
 
-`.env` loads after it, so repo-local settings (and the session
-`HORIZON_ACCESS_TOKEN`) still win.
+Without the helper the call is a no-op. `.env` loads afterwards either way, so
+repo-local settings (and the session `HORIZON_ACCESS_TOKEN`) still win.
 
 The tables below list the permissions the catalog's principal needs to **write**
 from an external engine (reads need a subset). Privilege names follow each

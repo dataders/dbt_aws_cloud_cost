@@ -61,8 +61,7 @@ wheels/
 .env
 .env.*
 !.env.example
-.envrc.private
-.envrc.local
+!.envrc
 .user.yml
 .secrets
 credentials.json
