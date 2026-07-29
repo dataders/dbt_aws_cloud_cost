@@ -7,8 +7,8 @@ profile: aws_cloud_cost
 models:
   aws_cloud_cost:
     ## Must match the single uncommented catalog in catalogs.yml.
-    ## Valid names: ducklake | lakekeeper | horizon | polaris | unity | s3_tables
-    +catalog_name: ducklake
+    ## Valid names: ducklake | lakekeeper | horizon | mdls | unity | s3_tables
+    +catalog_name: mdls
     +schema: aws_cloud_cost
     +materialized: table
 

@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # Every catalog the demo ships a (possibly commented) block for.
-ALL_CATALOGS = ["ducklake", "lakekeeper", "horizon", "polaris", "unity", "s3_tables"]
+ALL_CATALOGS = ["ducklake", "lakekeeper", "horizon", "mdls", "unity", "s3_tables"]
 
 
 class DemoConfigurationTest(unittest.TestCase):

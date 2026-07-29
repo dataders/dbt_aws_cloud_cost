@@ -12,14 +12,30 @@
 ##      .env.example. See README "Switching catalogs".
 
 catalogs:
-  - name: ducklake
-    type: ducklake
-    table_format: default
+  ## mdls — Iceberg REST against a Fivetran-managed Polaris catalog.
+  ## Needs the polaris_oauth secret in profiles.yml + the POLARIS_* env vars.
+  - name: mdls
+    type: iceberg_rest
+    table_format: iceberg
     config:
       duckdb:
-        metadata_path: "data/ducklake.db"
-        attach_as: "ducklake"
-        create_if_not_exists: true
+        endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
+        warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
+        secret: polaris_oauth
+        authorization_type: "OAUTH2"
+        access_delegation_mode: "{{ env_var('POLARIS_ACCESS_DELEGATION_MODE', 'VENDED_CREDENTIALS') }}"
+        default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
+        attach_as: "polaris"
+        default_schema: "aws_cloud_cost"
+## ducklake — the zero-credential default
+#   - name: ducklake
+#     type: ducklake
+#     table_format: default
+#     config:
+#       duckdb:
+#         metadata_path: "data/ducklake.db"
+#         attach_as: "ducklake"
+#         create_if_not_exists: true
 
 #   - name: horizon
 #     type: horizon
@@ -73,20 +89,6 @@ catalogs:
 #         access_delegation_mode: "NONE"
 #         attach_as: "lakekeeper"
 #         default_schema: "default"
-
-#   - name: polaris
-#     type: iceberg_rest
-#     table_format: iceberg
-#     config:
-#       duckdb:
-#         endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
-#         warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
-#         secret: polaris_oauth
-#         authorization_type: "OAUTH2"
-#         access_delegation_mode: "{{ env_var('POLARIS_ACCESS_DELEGATION_MODE', 'VENDED_CREDENTIALS') }}"
-#         default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
-#         attach_as: "polaris"
-#         default_schema: "aws_cloud_cost"
 
 #   - name: r2
 #     type: iceberg_rest

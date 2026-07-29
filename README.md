@@ -38,7 +38,7 @@ glance:
 | `ducklake` | DuckLake (local metadata) | ✅ default | nothing |
 | `lakekeeper` | Iceberg REST (local) | ✅ | `docker compose up -d` |
 | `horizon` | Snowflake Horizon (Polaris REST) | ✅ | Snowflake creds (`SNOWFLAKE_*`) |
-| `polaris` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
+| `mdls` | Iceberg REST (Polaris) | ✅ | Polaris creds (`POLARIS_*`) |
 | `unity` | Databricks Unity Catalog | ✅ | Databricks creds (`DATABRICKS_*`) |
 | `s3_tables` | Amazon S3 Tables | 🧪 driver-only (Fusion adapter support pending) | AWS creds |
 
@@ -85,9 +85,9 @@ The default `ducklake` path needs **no credentials**.
    ```
 4. **Inspect the output** — see [Setup and run](#setup-and-run).
 5. **(optional) Try another catalog** — pick one of `lakekeeper` / `horizon` /
-   `polaris` / `unity`, one at a time, per
+   `mdls` / `unity`, one at a time, per
    [Switching catalogs](#switching-catalogs). Verified writing: ducklake,
-   lakekeeper, polaris, horizon (Snowflake), unity (Databricks).
+   lakekeeper, mdls (Polaris), horizon (Snowflake), unity (Databricks).
 
 ## Install dbt
 
@@ -223,7 +223,7 @@ Keep `+schema: aws_cloud_cost` so the `generate_schema_name` macro substitutes
 the uppercase `CATALOG_SCHEMA`. Re-run `refresh_horizon_token.sh` when the token
 expires.
 
-### polaris (Iceberg REST)
+### mdls (Iceberg REST — Polaris)
 
 Set the `POLARIS_*` vars. The principal's catalog role needs namespace + table
 write privileges:

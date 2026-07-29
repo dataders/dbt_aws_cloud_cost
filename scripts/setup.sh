@@ -37,7 +37,7 @@ setup ok. next:
   set -a && source .env && set +a      # or: direnv allow
   dbt seed && dbt run                  # builds into the default ducklake catalog (no creds)
 
-external catalogs (horizon / polaris / unity / s3_tables): copy their vars from
+external catalogs (horizon / mdls / unity / s3_tables): copy their vars from
 .env.example into .env, then uncomment the matching block in catalogs.yml and
 profiles.yml. see README > Switching catalogs.
 EOF
