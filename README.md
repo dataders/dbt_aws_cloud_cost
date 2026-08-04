@@ -15,6 +15,76 @@ The default path (`ducklake`) runs with **zero credentials**.
 > Throughout, "dbt" means the dbt Fusion (dbt Core v2) `dbt` CLI —
 > see [Install dbt](#install-dbt)
 
+## Alt-compute-only demo (this branch)
+
+This branch is one of two switchable demo scenarios exercising Fivetran's
+internal dbt-compute service (an "Alt engine" `type: alt` dbt adapter that
+talks to a Fivetran-managed MDLS/Polaris Iceberg destination). The other
+scenario — a 3-stage Snowflake → Alt → Snowflake DAG that hands off through a
+catalog-linked database — lives on the `add-mdls-dbt-compute-target` branch.
+Switch between them with `git checkout <branch>`.
+
+On this branch, the **entire DAG runs on the Alt engine** as the profile's
+plain default target — no `x_alt_target` routing, no `+catalog_name`, no
+`catalogs.yml` involvement. Models write straight into the Alt connection's
+own `database`/`schema` (the MDLS destination itself), which is why no
+catalog config is needed at all:
+
+```yaml
+# profiles.yml
+aws_cloud_cost:
+  target: dbt_compute
+  outputs:
+    dbt_compute:
+      type: alt
+      method: token
+      base_url: "{{ env_var('DBT_COMPUTE_BASE_URL', 'https://api.dbt-compute.staging.fivetran.com/') }}"
+      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN', '') }}"
+      organization: "{{ env_var('DBT_COMPUTE_ORG', 'fivetran') }}"
+      database: "{{ env_var('DBT_COMPUTE_DATABASE', 'opening_pulling') }}"
+      schema: "{{ env_var('DBT_COMPUTE_SCHEMA', 'anders') }}"
+```
+
+**Required env vars** (see `.env.example` on the other branch for the
+equivalent list — this branch only needs the `DBT_COMPUTE_*` ones):
+`DBT_COMPUTE_BASE_URL`, `DBT_COMPUTE_AUTH_TOKEN`, `DBT_COMPUTE_ORG`,
+`DBT_COMPUTE_DATABASE`, `DBT_COMPUTE_SCHEMA`.
+
+**Prerequisites**, since `type: alt` isn't in the published CDN release yet:
+an fs-built `dbt` binary (e.g. `fs/target/debug/dbt`) and a locally-built
+`adbc_driver_dbt` (`quack/scripts/build-adbc-driver-local.sh`), pointed at via
+`ADBC_REPOSITORY` + `DISABLE_AUTO_DRIVER_REBUILD=true`.
+
+**Verified status, run for real against the staging service** (not just
+eyeballed as YAML):
+
+- `dbt run` (table materializations) **works**, but only after adding
+  [`macros/alt__drop_table.sql`](macros/alt__drop_table.sql). dbt-adapters'
+  generic default drop-table macro issues `drop table ... cascade`, which the
+  Alt engine's Iceberg REST write path rejects outright
+  (`[NotImplementedException] DROP TABLE <table_name> CASCADE is not
+  supported for Iceberg tables currently`) — fs's `dbt-alt` macro package
+  ships no macros of its own to override this, so every table
+  materialization's drop-before-create step failed without this override.
+- `dbt seed` **does not currently work**: loading the committed 10,000-row
+  seed against this target ran for 13+ minutes and then failed with a
+  network `Broken pipe` error, leaving the seed table created but **empty**
+  (confirmed via `select count(*)`). This is consistent with `dbt-alt`
+  falling back to a generic, unoptimized (likely row-by-row) insert path with
+  no adapter-specific bulk-load macro. `dbt run` against that empty seed
+  table does complete successfully — the DAG is structurally sound — but
+  there's currently no way to get real data into it via `dbt seed` on this
+  target. If you want to see the pipeline populated, load rows into the seed
+  table by some other means (e.g. a direct insert against the Alt
+  connection, or seeding via a different target first) rather than relying
+  on `dbt seed` here.
+
+See `docs/superpowers/specs/2026-08-04-mdls-dbt-compute-scenarios-design.md`
+on the `add-mdls-dbt-compute-target` branch for the full investigation
+(sourced directly from the `fs`/`quack` codebases — there is no public
+documentation for this internal service) into what dbt-compute does and does
+not support.
+
 ## How it works
 
 Each model picks its output catalog with `+catalog_name`, which dbt resolves to a
