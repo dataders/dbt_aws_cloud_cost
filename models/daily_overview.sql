@@ -1,6 +1,7 @@
 {{
     config(
         materialized='table',
+        alt_compute='alt',
         catalog_name='mdls',
         iceberg_version='3',
     )
@@ -85,8 +86,14 @@ fields as (
         {# Period Details #}
         cast({{ dbt.date_trunc('day', 'usage_start_date') }} as date) as usage_start_date,
         cast({{ dbt.date_trunc('day', 'usage_end_date') }} as date) as usage_end_date,
-        billing_period_start_date,
-        billing_period_end_date,
+        {#- dbt Compute's Alt-engine write path creates Iceberg v2 tables
+           regardless of this model's iceberg_version='3' config (v2 caps
+           timestamp precision at microseconds); billing_period_start/end_date
+           are nanosecond-precision TIMESTAMP_NTZ(9) from the upstream
+           timestamp_type cast, so truncate to date here the same way the
+           usage dates already are. -#}
+        cast(billing_period_start_date as date) as billing_period_start_date,
+        cast(billing_period_end_date as date) as billing_period_end_date,
 
         {# Account Details #}
         source_report.usage_account_id,

@@ -1,7 +1,6 @@
 {{
     config(
         materialized='table',
-        alt_compute='alt',
         catalog_name='mdls',
         iceberg_version='3',
     )

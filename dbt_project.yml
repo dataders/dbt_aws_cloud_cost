@@ -22,7 +22,7 @@ seeds:
     ## Seeds go into a plain (non-Iceberg) database — the catalog-linked
     ## database (snowflake_demo's default) rejects multi-statement
     ## transactions on unmanaged Iceberg tables, which seed loads use.
-    +database: "{{ env_var('SNOWFLAKE_DEMO_SEED_DATABASE', 'SEEDS') }}"
+    +database: "{{ env_var('SNOWFLAKE_SEED_DATABASE', 'SEEDS') }}"
     +schema: aws_cloud_cost
 
 vars:

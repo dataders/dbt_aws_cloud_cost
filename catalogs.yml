@@ -1,56 +1,10 @@
-## dbt catalogs (v2) for the multi-catalog demo.
-##
-## RULES:
-##   1. Fusion ATTACHES EVERY catalog defined in this file at every dbt
-##      invocation. Keep exactly ONE output catalog uncommented.
-##   2. The active catalog's `name` must match `+catalog_name` in
-##      dbt_project.yml.
-##   3. To switch catalogs, comment the active block and uncomment another
-##      (strip the leading `# ` from each line; prose comments use `##`).
-##   4. Credentialed catalogs also need their secret block uncommented in
-##      profiles.yml (same `# ` convention) and the env vars from
-##      .env.example. See README "Switching catalogs".
+## dbt catalogs (v2). Fusion attaches every catalog here — keep exactly one
+## uncommented, matching +catalog_name in dbt_project.yml.
 
 catalogs:
-  ## mdls — Iceberg REST against a Fivetran-managed Polaris catalog.
-  ## Needs the polaris_oauth secret in profiles.yml + the POLARIS_* env vars.
   - name: mdls
     type: iceberg_rest
     table_format: iceberg
     config:
       snowflake:
-        ## The catalog-linked database created from the Snowflake catalog
-        ## integration pointed at this same Polaris/MDLS destination.
-        catalog_database: "{{ env_var('SNOWFLAKE_DEMO_DATABASE', 'catalog_db_opening_pulling') }}"
-      duckdb:
-        endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
-        warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
-        secret: polaris_oauth
-        authorization_type: "OAUTH2"
-        access_delegation_mode: "{{ env_var('POLARIS_ACCESS_DELEGATION_MODE', 'VENDED_CREDENTIALS') }}"
-        default_region: "{{ env_var('POLARIS_DEFAULT_REGION', 'us-east-1') }}"
-        attach_as: "polaris"
-        default_schema: "aws_cloud_cost"
-
-
-  - name: horizon
-    type: horizon
-    table_format: iceberg
-    config:
-      snowflake:
-        external_volume: "{{ env_var('SNOWFLAKE_EXTERNAL_VOLUME', 'FUSION_ADAPTERS_CI_TEMP') }}"
-        base_location_root: "{{ env_var('SNOWFLAKE_BASE_LOCATION_ROOT', 'dbt_aws_cloud_cost/horizon') }}"
-      duckdb:
-        endpoint: "{{ env_var('HORIZON_ENDPOINT', 'https://example.snowflakecomputing.com/polaris/api/catalog') }}"
-        warehouse: "{{ env_var('HORIZON_WAREHOUSE', 'DEVELOPMENT') }}"
-        secret: snowflake_oauth
-        authorization_type: "OAUTH2"
-        access_delegation_mode: "VENDED_CREDENTIALS"
-        # must match the external volume's region (FUSION_ADAPTERS_CI_TEMP = us-east-1)
-        default_region: "{{ env_var('SNOWFLAKE_DEFAULT_REGION', 'us-east-1') }}"
-        stage_create_tables: false
-        disable_multi_table_commit: true
-        skip_create_table_metadata_updates: true
-        remove_files_on_delete: false
-        attach_as: "horizon"
-        default_schema: "{{ env_var('HORIZON_SCHEMA', 'AWS_CLOUD_COST') }}"
+        catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE') }}"

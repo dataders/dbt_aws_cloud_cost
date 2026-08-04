@@ -15,24 +15,24 @@ aws_cloud_cost:
     dbt_compute:
       type: alt
       method: token
-      base_url: "{{ env_var('DBT_COMPUTE_BASE_URL', 'https://api.dbt-compute.staging.fivetran.com/') }}"
-      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN', '') }}"
-      organization: "{{ env_var('DBT_COMPUTE_ORG', 'fivetran') }}"
-      database: "{{ env_var('DBT_COMPUTE_DATABASE', 'opening_pulling') }}"
-      schema: "{{ env_var('DBT_COMPUTE_SCHEMA', 'anders') }}"
+      base_url: "{{ env_var('DBT_COMPUTE_BASE_URL') }}"
+      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN') }}"
+      organization: "{{ env_var('DBT_COMPUTE_ORG') }}"
+      database: "{{ env_var('DBT_COMPUTE_DATABASE') }}"
+      schema: "{{ env_var('DBT_COMPUTE_SCHEMA') }}"
       threads: 4
     ## snowflake_demo — native Snowflake output against the catalog-linked
     ## database created from the Snowflake catalog integration pointed at the
-    ## opening_pulling MDLS destination. Password auth; creds come from the
-    ## "MDLS Compute (Snowflake)" 1Password item. See .env.example for the
-    ## SNOWFLAKE_DEMO_* vars.
+    ## opening_pulling MDLS destination. Key-pair auth (password 403s here);
+    ## creds come from the "MDLS Compute (Snowflake)" 1Password item. See
+    ## .env.example for the SNOWFLAKE_* vars.
     snowflake_demo:
       type: snowflake
-      account: "{{ env_var('SNOWFLAKE_DEMO_ACCOUNT') }}"
-      user: "{{ env_var('SNOWFLAKE_DEMO_USER') }}"
-      private_key: "{{ env_var('SNOWFLAKE_DEMO_PRIVATE_KEY') }}"
-      role: "{{ env_var('SNOWFLAKE_DEMO_ROLE', 'ACCOUNTADMIN') }}"
-      database: "{{ env_var('SNOWFLAKE_DEMO_DATABASE', 'catalog_db_opening_pulling') }}"
-      schema: "{{ env_var('SNOWFLAKE_DEMO_SCHEMA', 'anders') }}"
-      warehouse: "{{ env_var('SNOWFLAKE_DEMO_WAREHOUSE', 'COMPUTE_WH') }}"
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       threads: 4
