@@ -18,6 +18,10 @@ catalogs:
     type: iceberg_rest
     table_format: iceberg
     config:
+      snowflake:
+        ## The catalog-linked database created from the Snowflake catalog
+        ## integration pointed at this same Polaris/MDLS destination.
+        catalog_database: "{{ env_var('SNOWFLAKE_DEMO_DATABASE', 'catalog_db_opening_pulling') }}"
       duckdb:
         endpoint: "{{ env_var('POLARIS_URL', 'https://example.polaris.catalog') }}"
         warehouse: "{{ env_var('POLARIS_WAREHOUSE', 'aws_cloud_cost') }}"
