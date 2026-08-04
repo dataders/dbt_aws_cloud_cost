@@ -17,7 +17,7 @@ with source_report as (
 to their IDs so we can fill these in when needed. #}
 usage_account_mapping as (
 
-    select 
+    select
         usage_account_id,
         usage_account_name,
         source_relation,
@@ -36,7 +36,7 @@ usage_account_names as (
         sub.source_relation
     from (
         {# In case the account name as been updated, let's ensure we're only grabbing the most recent one #}
-        select 
+        select
             usage_account_id,
             usage_account_name,
             source_relation,
@@ -49,7 +49,7 @@ usage_account_names as (
 to their IDs so we can fill these in when needed. #}
 billing_account_mapping as (
 
-    select 
+    select
         bill_payer_account_id,
         bill_payer_account_name,
         source_relation,
@@ -68,7 +68,7 @@ billing_account_names as (
         sub.source_relation
     from (
         {# In case the account name as been updated, let's ensure we're only grabbing the most recent one #}
-        select 
+        select
             bill_payer_account_id,
             bill_payer_account_name,
             source_relation,
@@ -79,33 +79,45 @@ billing_account_names as (
 
 fields as (
 
-    select 
+    {#- The Alt engine's write path derives each output column's stored name
+       from how it's selected: a bare passthrough column keeps whatever case
+       the upstream (native-Snowflake, auto-uppercased) table already stores
+       it in, but an explicit alias is preserved exactly as written -- it does
+       NOT get auto-uppercased the way it would on a plain Snowflake CTAS.
+       Left alone, that produces a table with MIXED case (uppercase
+       passthroughs, lowercase computed columns), which then breaks downstream
+       native-Snowflake reads of the computed columns (unquoted references
+       auto-uppercase and no longer match). Every computed/aliased column
+       below is therefore explicitly aliased in UPPERCASE to match the
+       passthrough columns' casing. -#}
+    select
         source_report.source_relation,
-        report, 
+        report,
 
         {# Period Details #}
-        cast({{ dbt.date_trunc('day', 'usage_start_date') }} as date) as usage_start_date,
-        cast({{ dbt.date_trunc('day', 'usage_end_date') }} as date) as usage_end_date,
-        {#- dbt Compute's Alt-engine write path creates Iceberg v2 tables
-           regardless of this model's iceberg_version='3' config (v2 caps
-           timestamp precision at microseconds); billing_period_start/end_date
+        cast({{ dbt.date_trunc('day', 'usage_start_date') }} as date) as "USAGE_START_DATE",
+        cast({{ dbt.date_trunc('day', 'usage_end_date') }} as date) as "USAGE_END_DATE",
+        {#- Iceberg v2 caps timestamp precision at microseconds (the Alt
+           engine's write path always creates v2 tables regardless of this
+           model's iceberg_version='3' config -- that setting doesn't
+           propagate through the Alt write path); billing_period_start/end_date
            are nanosecond-precision TIMESTAMP_NTZ(9) from the upstream
            timestamp_type cast, so truncate to date here the same way the
            usage dates already are. -#}
-        cast(billing_period_start_date as date) as billing_period_start_date,
-        cast(billing_period_end_date as date) as billing_period_end_date,
+        cast(billing_period_start_date as date) as "BILLING_PERIOD_START_DATE",
+        cast(billing_period_end_date as date) as "BILLING_PERIOD_END_DATE",
 
         {# Account Details #}
         source_report.usage_account_id,
-        coalesce(source_report.usage_account_name, usage_account_names.usage_account_name) as usage_account_name,
+        coalesce(source_report.usage_account_name, usage_account_names.usage_account_name) as "USAGE_ACCOUNT_NAME",
         source_report.bill_payer_account_id,
-        coalesce(source_report.bill_payer_account_name, billing_account_names.bill_payer_account_name) as bill_payer_account_name,
+        coalesce(source_report.bill_payer_account_name, billing_account_names.bill_payer_account_name) as "BILL_PAYER_ACCOUNT_NAME",
 
         {# Billing Details #}
         invoice_id,
         invoicing_entity,
         billing_entity,
-        bill_type, 
+        bill_type,
         line_item_type,
         tax_type,
 
@@ -119,7 +131,7 @@ fields as (
         pricing_unit,
         usage_type,
         currency_code,
-        
+
         {# Line Item Service Details #}
         line_item_description,
         product_code,
@@ -147,45 +159,45 @@ fields as (
         to_region_code,
 
         {# Usage Metrics #}
-        cast(sum(coalesce(usage_amount, 0)) as {{ dbt.type_numeric() }}) as usage_amount,
-        cast(sum(coalesce(normalized_usage_amount, 0)) as {{ dbt.type_numeric() }}) as normalized_usage_amount,
-        cast(max(normalization_factor) as {{ dbt.type_numeric() }}) as normalization_factor,
+        cast(sum(coalesce(usage_amount, 0)) as {{ dbt.type_numeric() }}) as "USAGE_AMOUNT",
+        cast(sum(coalesce(normalized_usage_amount, 0)) as {{ dbt.type_numeric() }}) as "NORMALIZED_USAGE_AMOUNT",
+        cast(max(normalization_factor) as {{ dbt.type_numeric() }}) as "NORMALIZATION_FACTOR",
 
         {# Cost Metrics - General #}
-        cast(sum(coalesce(blended_cost, 0)) as {{ dbt.type_numeric() }}) as blended_cost,
-        cast(sum(coalesce(unblended_cost, 0)) as {{ dbt.type_numeric() }}) as unblended_cost,
-        cast(sum(coalesce(public_on_demand_cost, 0)) as {{ dbt.type_numeric() }}) as public_on_demand_cost,
-        cast(avg(blended_rate) as {{ dbt.type_numeric() }}) as avg_blended_rate,
-        cast(avg(unblended_rate) as {{ dbt.type_numeric() }}) as avg_unblended_rate,
-        cast(avg(public_on_demand_rate) as {{ dbt.type_numeric() }}) as avg_public_on_demand_rate,
-        cast(count(*) as {{ dbt.type_numeric() }}) as count_line_items,
+        cast(sum(coalesce(blended_cost, 0)) as {{ dbt.type_numeric() }}) as "BLENDED_COST",
+        cast(sum(coalesce(unblended_cost, 0)) as {{ dbt.type_numeric() }}) as "UNBLENDED_COST",
+        cast(sum(coalesce(public_on_demand_cost, 0)) as {{ dbt.type_numeric() }}) as "PUBLIC_ON_DEMAND_COST",
+        cast(avg(blended_rate) as {{ dbt.type_numeric() }}) as "AVG_BLENDED_RATE",
+        cast(avg(unblended_rate) as {{ dbt.type_numeric() }}) as "AVG_UNBLENDED_RATE",
+        cast(avg(public_on_demand_rate) as {{ dbt.type_numeric() }}) as "AVG_PUBLIC_ON_DEMAND_RATE",
+        cast(count(*) as {{ dbt.type_numeric() }}) as "COUNT_LINE_ITEMS",
 
-        {# Cost & Usage Metrics - Reservations 
-            Using MAX's + MIN's under the assumption that there is a 1:Many relationship between Reservations and Line Items 
+        {# Cost & Usage Metrics - Reservations
+            Using MAX's + MIN's under the assumption that there is a 1:Many relationship between Reservations and Line Items
         #}
-        cast(max(reservation_amortized_upfront_cost_for_usage) as {{ dbt.type_numeric() }}) as reservation_amortized_upfront_cost_for_usage,
-        cast(max(reservation_amortized_upfront_fee_for_billing_period) as {{ dbt.type_numeric() }}) as reservation_amortized_upfront_fee_for_billing_period,
-        cast(max(reservation_effective_cost) as {{ dbt.type_numeric() }}) as reservation_effective_cost,
-        cast(max(number_of_reservations) as {{ dbt.type_numeric() }}) as number_of_reservations,
-        cast(max(normalized_units_per_reservation) as {{ dbt.type_numeric() }}) as normalized_units_per_reservation,
-        cast(max(units_per_reservation) as {{ dbt.type_numeric() }}) as units_per_reservation,
-        cast(max(total_reserved_normalized_units) as {{ dbt.type_numeric() }}) as total_reserved_normalized_units,
-        cast(max(total_reserved_units) as {{ dbt.type_numeric() }}) as total_reserved_units,
-        
-        cast(max(reservation_recurring_fee_for_usage) as {{ dbt.type_numeric() }}) as reservation_recurring_fee_for_usage,
-        cast(min(reservation_unused_amortized_upfront_fee_for_billing_period) as {{ dbt.type_numeric() }}) as reservation_unused_amortized_upfront_fee_for_billing_period,
-        cast(min(reservation_unused_normalized_unit_quantity) as {{ dbt.type_numeric() }}) as reservation_unused_normalized_unit_quantity,
-        cast(min(reservation_unused_quantity) as {{ dbt.type_numeric() }}) as reservation_unused_quantity,
-        cast(min(reservation_unused_recurring_fee) as {{ dbt.type_numeric() }}) as reservation_unused_recurring_fee,
-        cast(max(reservation_upfront_value) as {{ dbt.type_numeric() }}) as reservation_upfront_value,
+        cast(max(reservation_amortized_upfront_cost_for_usage) as {{ dbt.type_numeric() }}) as "RESERVATION_AMORTIZED_UPFRONT_COST_FOR_USAGE",
+        cast(max(reservation_amortized_upfront_fee_for_billing_period) as {{ dbt.type_numeric() }}) as "RESERVATION_AMORTIZED_UPFRONT_FEE_FOR_BILLING_PERIOD",
+        cast(max(reservation_effective_cost) as {{ dbt.type_numeric() }}) as "RESERVATION_EFFECTIVE_COST",
+        cast(max(number_of_reservations) as {{ dbt.type_numeric() }}) as "NUMBER_OF_RESERVATIONS",
+        cast(max(normalized_units_per_reservation) as {{ dbt.type_numeric() }}) as "NORMALIZED_UNITS_PER_RESERVATION",
+        cast(max(units_per_reservation) as {{ dbt.type_numeric() }}) as "UNITS_PER_RESERVATION",
+        cast(max(total_reserved_normalized_units) as {{ dbt.type_numeric() }}) as "TOTAL_RESERVED_NORMALIZED_UNITS",
+        cast(max(total_reserved_units) as {{ dbt.type_numeric() }}) as "TOTAL_RESERVED_UNITS",
+
+        cast(max(reservation_recurring_fee_for_usage) as {{ dbt.type_numeric() }}) as "RESERVATION_RECURRING_FEE_FOR_USAGE",
+        cast(min(reservation_unused_amortized_upfront_fee_for_billing_period) as {{ dbt.type_numeric() }}) as "RESERVATION_UNUSED_AMORTIZED_UPFRONT_FEE_FOR_BILLING_PERIOD",
+        cast(min(reservation_unused_normalized_unit_quantity) as {{ dbt.type_numeric() }}) as "RESERVATION_UNUSED_NORMALIZED_UNIT_QUANTITY",
+        cast(min(reservation_unused_quantity) as {{ dbt.type_numeric() }}) as "RESERVATION_UNUSED_QUANTITY",
+        cast(min(reservation_unused_recurring_fee) as {{ dbt.type_numeric() }}) as "RESERVATION_UNUSED_RECURRING_FEE",
+        cast(max(reservation_upfront_value) as {{ dbt.type_numeric() }}) as "RESERVATION_UPFRONT_VALUE",
 
         {# Cost & Usage Metrics - Savings Plans #}
-        cast(max(savings_plan_amortized_upfront_commitment_for_billing_period) as {{ dbt.type_numeric() }}) as savings_plan_amortized_upfront_commitment_for_billing_period,
-        cast(max(savings_plan_recurring_commitment_for_billing_period) as {{ dbt.type_numeric() }}) as savings_plan_recurring_commitment_for_billing_period,
-        cast(max(savings_plan_effective_cost) as {{ dbt.type_numeric() }}) as savings_plan_effective_cost,
-        cast(max(savings_plan_rate) as {{ dbt.type_numeric() }}) as savings_plan_rate,
-        cast(max(savings_plan_total_commitment_to_date) as {{ dbt.type_numeric() }}) as savings_plan_total_commitment_to_date,
-        cast(max(savings_plan_used_commitment) as {{ dbt.type_numeric() }}) as savings_plan_used_commitment 
+        cast(max(savings_plan_amortized_upfront_commitment_for_billing_period) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_AMORTIZED_UPFRONT_COMMITMENT_FOR_BILLING_PERIOD",
+        cast(max(savings_plan_recurring_commitment_for_billing_period) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_RECURRING_COMMITMENT_FOR_BILLING_PERIOD",
+        cast(max(savings_plan_effective_cost) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_EFFECTIVE_COST",
+        cast(max(savings_plan_rate) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_RATE",
+        cast(max(savings_plan_total_commitment_to_date) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_TOTAL_COMMITMENT_TO_DATE",
+        cast(max(savings_plan_used_commitment) as {{ dbt.type_numeric() }}) as "SAVINGS_PLAN_USED_COMMITMENT"
 
     from source_report
     left join billing_account_names
@@ -201,7 +213,7 @@ fields as (
 final as (
 {%- set composite_key = [
         'source_relation',
-        'report', 
+        'report',
         'usage_start_date',
         'usage_end_date',
         'billing_period_start_date',
@@ -213,7 +225,7 @@ final as (
         'invoice_id',
         'invoicing_entity',
         'billing_entity',
-        'bill_type', 
+        'bill_type',
         'line_item_type',
         'tax_type',
         'purchase_option',
@@ -241,12 +253,12 @@ final as (
         'to_location',
         'to_location_type',
         'to_region_code'
-    ] 
+    ]
 -%}
 
-    select 
-        *, 
-        {{ dbt_utils.generate_surrogate_key(composite_key) }} as unique_key
+    select
+        *,
+        {{ dbt_utils.generate_surrogate_key(composite_key) }} as "UNIQUE_KEY"
     from fields
 )
 
