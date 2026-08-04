@@ -124,6 +124,20 @@ CLI doesn't support `type: alt` yet) and a locally-built `adbc_driver_dbt`
   `daily_instance_report`/`daily_product_report` can read `daily_overview`'s
   rows back through the CLD. **This is the one remaining blocker on this
   branch** — everything else in the DAG is verified working.
+- To isolate whether the *downstream read* half of this scenario (Snowflake
+  reading `daily_overview`'s rows back through the CLD) works independently
+  of the Alt-engine propagation blocker, `daily_overview` was temporarily
+  built **natively on Snowflake** instead (dropping `alt_compute='alt'` from
+  its config, table pre-dropped since Iceberg CLD tables don't support
+  `CREATE OR REPLACE`) and the full DAG re-run. Result: **all 4 models
+  succeeded**, with real data —
+  `daily_instance_report` has 144 rows, `daily_product_report` has 576 —
+  proving the `catalog_name`-driven CLD read path itself is correct. The
+  *only* broken piece of this scenario is specifically the Alt engine's
+  write-visibility credential-propagation step; everything else (the DAG
+  shape, the timestamp fix, the CLD read mechanism) is proven working. This
+  was a temporary diagnostic change, reverted immediately after — the
+  committed model still uses `alt_compute='alt'` as designed.
 
 ## Quick start
 
