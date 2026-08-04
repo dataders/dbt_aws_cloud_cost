@@ -100,44 +100,52 @@ CLI doesn't support `type: alt` yet) and a locally-built `adbc_driver_dbt`
 (`quack/scripts/build-adbc-driver-local.sh`), pointed at via
 `ADBC_REPOSITORY` + `DISABLE_AUTO_DRIVER_REBUILD=true`.
 
-**Verified status, run for real against the staging service:**
+**Verified status — full happy path confirmed end-to-end for real**, `dbt seed && dbt run`
+against the staging service (not just eyeballed as YAML): all 4 models
+succeed, `daily_instance_report` has 144 rows, `daily_product_report` has
+576 — through the actual Alt engine write path, no bypass. Getting there
+required three real fixes, none of them in this repo's SQL/config alone —
+worth knowing if you're setting this up yourself:
 
-- `stg_report` (Snowflake) builds correctly.
-- `daily_overview` (Alt engine write) needed one real fix: the Alt write path
-  creates Iceberg **v2** tables regardless of a model's `iceberg_version='3'`
-  config — that config simply doesn't propagate through the Alt engine's
-  write path. v2 caps timestamp precision at microseconds, and
-  `billing_period_start_date`/`billing_period_end_date` arrive as
-  nanosecond-precision timestamps, so the model now casts them to `date` (the
-  same treatment `usage_start_date`/`usage_end_date` already got) instead of
-  relying on `iceberg_version` to fix it.
-- With that fixed, `daily_overview`'s table creation itself succeeds, but the
-  **write-visibility credential propagation step back to Snowflake currently
-  fails** (confirmed twice, including a `--full-refresh` retry — not a
-  transient blip): `Propagation failed for ... Network policy is required` —
-  the Snowflake account's network policy is rejecting connections from
-  wherever the dbt-compute staging service runs. This is a Snowflake account
-  security setting, not a bug in this repo's config, and not something to fix
-  by editing project files: whoever administers the `snowflake_demo`
-  account's (`oeqikbr-bj94303`) network policy needs to allowlist the
-  dbt-compute staging service's egress IP(s), or loosen the policy, before
-  `daily_instance_report`/`daily_product_report` can read `daily_overview`'s
-  rows back through the CLD. **This is the one remaining blocker on this
-  branch** — everything else in the DAG is verified working.
-- To isolate whether the *downstream read* half of this scenario (Snowflake
-  reading `daily_overview`'s rows back through the CLD) works independently
-  of the Alt-engine propagation blocker, `daily_overview` was temporarily
-  built **natively on Snowflake** instead (dropping `alt_compute='alt'` from
-  its config, table pre-dropped since Iceberg CLD tables don't support
-  `CREATE OR REPLACE`) and the full DAG re-run. Result: **all 4 models
-  succeeded**, with real data —
-  `daily_instance_report` has 144 rows, `daily_product_report` has 576 —
-  proving the `catalog_name`-driven CLD read path itself is correct. The
-  *only* broken piece of this scenario is specifically the Alt engine's
-  write-visibility credential-propagation step; everything else (the DAG
-  shape, the timestamp fix, the CLD read mechanism) is proven working. This
-  was a temporary diagnostic change, reverted immediately after — the
-  committed model still uses `alt_compute='alt'` as designed.
+1. **Timestamp precision.** The Alt write path creates Iceberg **v2** tables
+   regardless of a model's `iceberg_version='3'` config — that config simply
+   doesn't propagate through the Alt engine's write path. v2 caps timestamp
+   precision at microseconds, and `billing_period_start_date`/
+   `billing_period_end_date` arrive as nanosecond-precision timestamps, so
+   `daily_overview` now casts them to `date` (the same treatment
+   `usage_start_date`/`usage_end_date` already got) instead of relying on
+   `iceberg_version` to fix it.
+2. **Snowflake network policy** (account-side, not this repo). The
+   write-visibility credential-propagation step back to Snowflake failed with
+   `Propagation failed for ... Network policy is required` until a network
+   policy existed on the account/user at all — Snowflake requires *some*
+   network policy to exist before a PAT can be minted, independent of any
+   specific IP allowlisting. Once one existed, the real failure was the
+   *specific* connecting IP not being in it (`Incoming request with IP/Token
+   ... is not allowed`) — add the dbt-compute service's actual egress IP,
+   confirmed empirically rather than guessed from Fivetran's public connector
+   IP list (that list is for the standard ELT connectors; this PrPr service's
+   egress IP isn't published there).
+3. **Mixed-case output columns** — the interesting one, and worth documenting
+   since it's distinct from the CLD case-sensitivity gotcha in earlier
+   internal notes. The Alt engine's write path derives each output column's
+   stored name from *how it's selected*: a bare passthrough column (e.g.
+   `source_report.source_relation`) keeps whatever case the upstream
+   native-Snowflake table already stores it in (uppercase, Snowflake's
+   default); an explicit alias gets normalized to lowercase by the compiler
+   *unless it's double-quoted*. Left alone, this produces a single table with
+   **mixed case** — uppercase passthroughs, lowercase computed columns —
+   which breaks every downstream native-Snowflake read of a computed column
+   (unquoted references auto-uppercase and no longer match:
+   `invalid identifier 'USAGE_START_DATE'`). Fix: every computed/aliased
+   column in `daily_overview.sql` uses an explicit double-quoted
+   **UPPERCASE** alias, matching the passthrough columns. This is also why a
+   trivial single-computed-column test model (like `select 1 as my_foo`)
+   never hits this — there's nothing for it to mismatch against.
+
+None of the above three fixes needed touching Snowflake account security
+settings beyond the one-time network-policy existence + IP requirement in
+point 2, which only an account admin should do.
 
 ## Quick start
 
