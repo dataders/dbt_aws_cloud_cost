@@ -78,27 +78,41 @@ Snowflake/CLD is involved (Scenario 2); irrelevant for Scenario 1.
 | Mixed-compute DAGs | Supported via the catalog-reachability resolver rule above |
 | Driver distribution | No CDN release yet — requires a locally-built `adbc_driver_dbt` |
 
+This table describes the **routing** path only. Scenario 1 below uses the
+other, unmaintained mechanism (bare `type: alt` default target, no routing) —
+none of these rows are known to apply to it; that path is genuinely
+undocumented upstream.
+
 ## Scenario 1: `alt-compute-only` branch
 
 Branched from `main` (not from the mixed-compute branch — avoids carrying
 Scenario 2's per-model `catalog_name`/`alt_compute` overrides).
 
-- `profiles.yml`: `target` points directly at the alt/dbt-compute output
-  (no `x_alt_target`). Same connection fields as today's `dbt_compute` output
-  (`base_url`, `token`, `organization`, `database`, `schema`, `threads`).
+- `profiles.yml`: `main`'s profile is DuckDB-only today (no `dbt_compute`
+  output exists there yet). Port the `dbt_compute` output block from this
+  branch's history (introduced in `8ef7b64`, base URL fixed in `2b97751`)
+  over onto `main`'s profile, then point `target` directly at it (no
+  `x_alt_target`) — same connection fields as it has today: `base_url`,
+  `method: token`, `token`, `organization`, `database`, `schema`, `threads`,
+  sourced from `DBT_COMPUTE_BASE_URL`, `DBT_COMPUTE_AUTH_TOKEN`,
+  `DBT_COMPUTE_ORG`, `DBT_COMPUTE_DATABASE`, `DBT_COMPUTE_SCHEMA`.
 - `dbt_project.yml`: no `+catalog_name`, no `+alt_compute` anywhere;
   `use_catalogs_v2` off (not needed — routing is the only thing that requires
   it).
-- `catalogs.yml`: removed (or left as an unreferenced/deleted file) — nothing
-  in the project points at it.
+- `catalogs.yml`: left fully intact (all catalog blocks, including
+  `ducklake`/`lakekeeper`/`horizon`/`unity`/`s3_tables`, stay as they are on
+  `main`) but **unreferenced** — no model sets `+catalog_name`, so the file
+  has no effect on this branch's run. Not deleted; out of scope to touch its
+  contents (see Out of scope).
 - Seeds: no special database/workaround — load natively via the Alt
   connection's own `database`/`schema`.
-- Models: plain `+materialized: table` (or whatever the pre-cda2f69 baseline
-  was on `main`), no per-model catalog config.
+- Models: plain `+materialized: table` (`main`'s current baseline), no
+  per-model catalog config.
 - README: new section documenting this path, its prerequisites (fs-built
-  `dbt` binary, locally-built `adbc_driver_dbt`, `DBT_COMPUTE_*` env vars),
-  and the explicit caveat that this is the less-exercised of the two Alt
-  patterns.
+  `dbt` binary, locally-built `adbc_driver_dbt`, the five `DBT_COMPUTE_*` env
+  vars above), and the explicit caveat that this is the less-exercised of the
+  two Alt patterns (see Background — the feature-support table doesn't apply
+  here).
 
 ## Scenario 2: `add-mdls-dbt-compute-target` branch (continued)
 
@@ -118,6 +132,12 @@ needed:
   `catalog_name='mdls'` + `iceberg_version='3'` stay on all four models
   (`stg_report`, `daily_overview`, `daily_instance_report`,
   `daily_product_report`) as they are today.
+
+  **Risk**: this inverts the data-flow direction from what commit `cda2f69`
+  actually verified end-to-end (Snowflake writes, Alt-engine leaf reads back).
+  The new direction — Alt engine writes Iceberg, Snowflake CLD reads back —
+  is unverified and is exactly what the Verification section below needs to
+  confirm before calling this branch done.
 - Fold in the uncommitted working-tree cleanup already sitting on this branch
   (`SNOWFLAKE_DEMO_*` → `SNOWFLAKE_*` env var rename, dropped unused `horizon`
   catalog block) as part of this work.
@@ -143,7 +163,9 @@ on each branch; confirm rows land in the expected destination for each stage.
 
 ## Out of scope
 
-- No changes to `unity`/`s3_tables`/`ducklake`/`lakekeeper` catalog paths.
+- No changes to the *content* of the `unity`/`s3_tables`/`ducklake`/
+  `lakekeeper`/`horizon` catalog blocks in `catalogs.yml` on either branch —
+  Scenario 1 leaves the file in place unreferenced rather than editing it.
 - No changes to the dbt-compute service itself (`quack` repo) — demo-project
   changes only.
 - Not attempting to make grants/contracts/constraints work on the Alt engine
