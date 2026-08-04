@@ -6,9 +6,11 @@ profile: aws_cloud_cost
 
 models:
   aws_cloud_cost:
-    ## Must match the single uncommented catalog in catalogs.yml.
-    ## Valid names: ducklake | lakekeeper | horizon | mdls | unity | s3_tables
-    +catalog_name: mdls
+    ## No +catalog_name on this branch: the whole project's default target IS
+    ## the Alt engine (see profiles.yml), and +catalog_name is known-broken
+    ## there (build_relation_catalog has no dispatch arm for AdapterType::Alt
+    ## -- see docs/superpowers/specs/2026-08-04-mdls-dbt-compute-scenarios-design.md).
+    ## Models write straight into the dbt_compute output's own database/schema.
     +schema: aws_cloud_cost
     +materialized: table
 

@@ -1,57 +1,17 @@
-## Profile for the multi-catalog demo (DuckDB only).
-##
-## Secret blocks follow the same convention as catalogs.yml: the secrets for
-## inactive catalogs are commented with `# ` and must be uncommented together
-## with their catalog block. minio_secret stays active — it is static, makes
-## no network call at creation, and is required by the lakekeeper target.
+## Profile for the alt-compute-only demo: the whole DAG runs on the
+## dbt-compute (Alt engine) target directly — no x_alt_target routing, no
+## catalogs.yml involvement. Needs an fs-built dbt (the published CLI
+## doesn't support `type: alt` yet) plus the adbc_driver_dbt built via
+## quack/scripts/build-adbc-driver-local.sh. See .env.example.
 aws_cloud_cost:
-  target: catalog_demo
+  target: dbt_compute
   outputs:
-    catalog_demo:
-      type: duckdb
-      path: "data/aws_cloud_cost_demo.duckdb"
-      schema: aws_cloud_cost
+    dbt_compute:
+      type: alt
+      method: token
+      base_url: "{{ env_var('DBT_COMPUTE_BASE_URL', 'https://api.dbt-compute.staging.fivetran.com/') }}"
+      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN', '') }}"
+      organization: "{{ env_var('DBT_COMPUTE_ORG', 'fivetran') }}"
+      database: "{{ env_var('DBT_COMPUTE_DATABASE', 'opening_pulling') }}"
+      schema: "{{ env_var('DBT_COMPUTE_SCHEMA', 'anders') }}"
       threads: 4
-      settings:
-        ## The official DuckDB 1.5.4 driver (fetched from the dbt CDN) does NOT
-        ## statically link httpfs/iceberg/ducklake, so DuckDB autoloads (and, on
-        ## first use, autoinstalls) those signed extensions from the official
-        ## extension repository. Leave autoinstall/autoload enabled.
-        autoinstall_known_extensions: true
-        autoload_known_extensions: true
-      secrets:
-        ## mdls (Polaris) — uncomment with the mdls catalog block
-        - type: iceberg
-          name: polaris_oauth
-          client_id: "{{ env_var('POLARIS_ID', '') }}"
-          client_secret: "{{ env_var('POLARIS_SECRET', '') }}"
-          oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
-          oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
-          oauth2_grant_type: "client_credentials"
-        ## horizon (Snowflake) — uncomment with the horizon catalog block.
-        ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
-        ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
-#         - type: iceberg
-#           name: snowflake_oauth
-#           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
-        ## unity (Databricks; read-write) — uncomment with the unity catalog block
-#         - type: iceberg
-#           name: databricks_token
-#           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
-        ## for local lakekeeper
-        - type: s3
-          name: minio_secret
-          key_id: minio-root-user
-          secret: minio-root-password
-          endpoint: "localhost:19000"
-          url_style: path
-          use_ssl: false
-#         ## r2 (Cloudflare R2 Data Catalog) — uncomment with the r2 catalog block
-#         - type: iceberg
-#           name: r2_token
-#           token: "{{ env_var('R2_TOKEN_VALUE', '') }}"
-#         ## s3_tables — uncomment with the s3_tables catalog block
-#         - type: s3
-#           name: aws_s3_tables
-#           provider: credential_chain
-#           region: "{{ env_var('AWS_REGION', 'us-west-2') }}"
