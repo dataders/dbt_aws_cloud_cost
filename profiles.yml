@@ -6,7 +6,21 @@
 ## no network call at creation, and is required by the lakekeeper target.
 aws_cloud_cost:
   target: catalog_demo
+  x_alt_target: dbt_compute
   outputs:
+    ## dbt-compute (Alt engine) — queries the opening_pulling MDLS destination
+    ## via the staging dbt-compute service. Needs DBT_COMPUTE_AUTH_TOKEN (a
+    ## minted JWT) + DBT_COMPUTE_ORG from the env; see polaris.envrc /
+    ## dbt-aws-cloud-cost.envrc in the private overlay.
+    dbt_compute:
+      type: alt
+      method: token
+      base_url: "{{ env_var('POLARIS_URL', 'https://1k56c2c4xlti6-acc.us-east-1.aws.polaris.fivetran.com/api/catalog') }}"
+      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN', '') }}"
+      organization: "{{ env_var('DBT_COMPUTE_ORG', 'fivetran') }}"
+      database: "{{ env_var('DBT_COMPUTE_DATABASE', 'opening_pulling') }}"
+      schema: "{{ env_var('DBT_COMPUTE_SCHEMA', 'anders') }}"
+      threads: 4
     catalog_demo:
       type: duckdb
       path: "data/aws_cloud_cost_demo.duckdb"
@@ -19,39 +33,4 @@ aws_cloud_cost:
         ## extension repository. Leave autoinstall/autoload enabled.
         autoinstall_known_extensions: true
         autoload_known_extensions: true
-      secrets:
-        ## mdls (Polaris) — uncomment with the mdls catalog block
-        - type: iceberg
-          name: polaris_oauth
-          client_id: "{{ env_var('POLARIS_ID', '') }}"
-          client_secret: "{{ env_var('POLARIS_SECRET', '') }}"
-          oauth2_server_uri: "{{ env_var('POLARIS_OAUTH_TOKEN_URI', '') or ((env_var('POLARIS_URL', 'https://example.polaris.catalog')) ~ '/v1/oauth/tokens') }}"
-          oauth2_scope: "{{ env_var('POLARIS_OAUTH_SCOPE', 'PRINCIPAL_ROLE:ALL') }}"
-          oauth2_grant_type: "client_credentials"
-        ## horizon (Snowflake) — uncomment with the horizon catalog block.
-        ## Pre-minted KEY-PAIR access token (run scripts/refresh_horizon_token.sh first).
-        ## A PAT can read but NOT write to Horizon (createTable 403); key-pair works for both.
-#         - type: iceberg
-#           name: snowflake_oauth
-#           token: "{{ env_var('HORIZON_ACCESS_TOKEN', '') }}"
-        ## unity (Databricks; read-write) — uncomment with the unity catalog block
-#         - type: iceberg
-#           name: databricks_token
-#           token: "{{ env_var('DATABRICKS_TOKEN', '') }}"
-        ## for local lakekeeper
-        - type: s3
-          name: minio_secret
-          key_id: minio-root-user
-          secret: minio-root-password
-          endpoint: "localhost:19000"
-          url_style: path
-          use_ssl: false
-#         ## r2 (Cloudflare R2 Data Catalog) — uncomment with the r2 catalog block
-#         - type: iceberg
-#           name: r2_token
-#           token: "{{ env_var('R2_TOKEN_VALUE', '') }}"
-#         ## s3_tables — uncomment with the s3_tables catalog block
-#         - type: s3
-#           name: aws_s3_tables
-#           provider: credential_chain
-#           region: "{{ env_var('AWS_REGION', 'us-west-2') }}"
+    
