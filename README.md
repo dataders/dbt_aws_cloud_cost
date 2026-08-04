@@ -55,29 +55,39 @@ an fs-built `dbt` binary (e.g. `fs/target/debug/dbt`) and a locally-built
 `adbc_driver_dbt` (`quack/scripts/build-adbc-driver-local.sh`), pointed at via
 `ADBC_REPOSITORY` + `DISABLE_AUTO_DRIVER_REBUILD=true`.
 
-**Verified status, run for real against the staging service** (not just
-eyeballed as YAML):
+**Verified status — full happy path confirmed end-to-end for real** against
+the staging service, `dbt seed && dbt run`, with real data (not just
+eyeballed as YAML): seed loads 10,000 rows, all 4 models build, the final
+`daily_instance_report` has 24 rows. Two adapter-level gaps had to be worked
+around with project-local macro overrides — both are genuine bugs in this
+build of the Alt engine's generic (non-routed) execution path, not this demo
+project's SQL:
 
-- `dbt run` (table materializations) **works**, but only after adding
-  [`macros/alt__drop_table.sql`](macros/alt__drop_table.sql). dbt-adapters'
+- [`macros/alt__drop_table.sql`](macros/alt__drop_table.sql) — dbt-adapters'
   generic default drop-table macro issues `drop table ... cascade`, which the
   Alt engine's Iceberg REST write path rejects outright
   (`[NotImplementedException] DROP TABLE <table_name> CASCADE is not
-  supported for Iceberg tables currently`) — fs's `dbt-alt` macro package
+  supported for Iceberg tables currently`). fs's `dbt-alt` macro package
   ships no macros of its own to override this, so every table
   materialization's drop-before-create step failed without this override.
-- `dbt seed` **does not currently work**: loading the committed 10,000-row
-  seed against this target ran for 13+ minutes and then failed with a
-  network `Broken pipe` error, leaving the seed table created but **empty**
-  (confirmed via `select count(*)`). This is consistent with `dbt-alt`
-  falling back to a generic, unoptimized (likely row-by-row) insert path with
-  no adapter-specific bulk-load macro. `dbt run` against that empty seed
-  table does complete successfully — the DAG is structurally sound — but
-  there's currently no way to get real data into it via `dbt seed` on this
-  target. If you want to see the pipeline populated, load rows into the seed
-  table by some other means (e.g. a direct insert against the Alt
-  connection, or seeding via a different target first) rather than relying
-  on `dbt seed` here.
+- [`macros/alt__get_batch_size.sql`](macros/alt__get_batch_size.sql) —
+  dbt-adapters' default seed loader batches all 10,000 rows (~40 columns
+  each) into a **single** `INSERT ... VALUES (...), (...), ...` statement
+  (default batch size: 10000). Sent over the Alt engine's HTTP-based
+  dbt-compute API rather than a normal DB wire protocol, that one massive
+  statement reliably failed after 13+ minutes with a network `Broken pipe`,
+  leaving the seed table created but empty. Overriding the batch size down to
+  200 rows per statement fixed it — at the cost of speed: the seed now takes
+  **~27 minutes** to load (50 small INSERTs, each apparently a full
+  commit/rewrite cycle against the underlying Iceberg REST catalog). `dbt run`
+  itself is fast (4 models, ~1.5 minutes total) once the seed is loaded.
+
+```bash
+export ADBC_REPOSITORY=/path/to/quack/target/release
+export DISABLE_AUTO_DRIVER_REBUILD=true
+/path/to/fs/target/debug/dbt seed --project-dir . --profiles-dir .   # ~27 min
+/path/to/fs/target/debug/dbt run  --project-dir . --profiles-dir .   # ~1.5 min
+```
 
 See `docs/superpowers/specs/2026-08-04-mdls-dbt-compute-scenarios-design.md`
 on the `add-mdls-dbt-compute-target` branch for the full investigation
