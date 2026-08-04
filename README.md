@@ -54,6 +54,74 @@ and an **uppercase** target schema (`CATALOG_SCHEMA=AWS_CLOUD_COST`) — see
 separate target tracked in
 [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).
 
+### dbt-compute (Alt engine) feature support
+
+This branch also demonstrates Fivetran's internal, staging-only dbt-compute
+service (an "Alt engine" `type: alt` dbt adapter). There's no public
+documentation for it, so the table below is sourced directly from the
+`fs`/`quack` codebases. It describes the `+alt_compute: alt` **routing** path
+(specific models opting onto the Alt engine while the rest of the DAG runs
+elsewhere) — see the [Mixed-compute demo](#mixed-compute-demo-snowflake---alt---snowflake)
+section below for how this branch uses it. The sibling `alt-compute-only`
+branch uses a different, less-supported mechanism (a bare `type: alt` default
+target, no routing) that none of these rows describe — see that branch's
+README for its own findings.
+
+| Feature | Alt engine (`alt_compute: alt` routing) support |
+| --- | --- |
+| Materializations | `table`, `view`, `incremental` only |
+| Incremental strategies | `append`, `insert_overwrite` only — `merge`/`delete+insert`/`microbatch`/`replace_where` explicitly rejected at runtime |
+| Custom materializations | Pass parse-time validation, **always fail at runtime** — a real gap between the two layers |
+| Seeds | Not routable (no `+alt_compute` config field on seeds at all) |
+| Snapshots | Rejected at parse time |
+| Python models | Rejected at parse time (`alt_compute: 'alt' does not support Python models in v1`) |
+| Grants / contracts / constraints / persist_docs | Config accepted; the execution path bypasses macro dispatch entirely and never references them — moderate-confidence silent no-op, not an error |
+| Write-target catalog types | `iceberg_rest`, `horizon` only — `glue`/`unity`/`ducklake` hit a hard `unimplemented!()` panic |
+| Mixed-compute DAGs | Supported via a resolver rule: any `alt_compute: alt` model's upstreams must each be catalog-attached (`catalog_name` set, `table_format: iceberg`, or themselves `alt_compute: alt`) — otherwise a hard parse error |
+| Driver distribution | No CDN release yet — requires a locally-built `adbc_driver_dbt` |
+
+Full investigation, including file:line citations into the `fs`/`quack`
+source: `docs/superpowers/specs/2026-08-04-mdls-dbt-compute-scenarios-design.md`.
+
+## Mixed-compute demo: Snowflake -> Alt -> Snowflake
+
+A 3-stage DAG that hands off compute engines twice, all against the same MDLS
+destination via the catalog-linked database (CLD):
+
+```
+stg_report (Snowflake, catalog_name=mdls)
+  -> daily_overview (alt_compute=alt, catalog_name=mdls)   [writes to Polaris/MDLS directly]
+      -> daily_instance_report, daily_product_report (Snowflake, catalog_name=mdls)  [read back via CLD]
+```
+
+Required env vars: the `SNOWFLAKE_*` and `DBT_COMPUTE_*` sections of
+`.env.example`. Prerequisites: an fs-built `dbt` binary (the published CDN
+CLI doesn't support `type: alt` yet) and a locally-built `adbc_driver_dbt`
+(`quack/scripts/build-adbc-driver-local.sh`), pointed at via
+`ADBC_REPOSITORY` + `DISABLE_AUTO_DRIVER_REBUILD=true`.
+
+**Verified status, run for real against the staging service:**
+
+- `stg_report` (Snowflake) builds correctly.
+- `daily_overview` (Alt engine write) needed one real fix: the Alt write path
+  creates Iceberg **v2** tables regardless of a model's `iceberg_version='3'`
+  config — that config simply doesn't propagate through the Alt engine's
+  write path. v2 caps timestamp precision at microseconds, and
+  `billing_period_start_date`/`billing_period_end_date` arrive as
+  nanosecond-precision timestamps, so the model now casts them to `date` (the
+  same treatment `usage_start_date`/`usage_end_date` already got) instead of
+  relying on `iceberg_version` to fix it.
+- With that fixed, `daily_overview`'s table creation itself succeeds, but the
+  **write-visibility credential propagation step back to Snowflake currently
+  fails**: `Propagation failed for ... Network policy is required` — the
+  Snowflake account's network policy is rejecting connections from wherever
+  the dbt-compute staging service runs. This is a Snowflake account security
+  setting, not a bug in this repo's config; whoever administers the
+  `snowflake_demo` account's network policy needs to allowlist the
+  dbt-compute staging service's egress IP(s) (or loosen the policy) before
+  `daily_instance_report`/`daily_product_report` can read `daily_overview`'s
+  rows back through the CLD. Not yet re-verified end-to-end past this point.
+
 ## Quick start
 
 The default `ducklake` path needs **no credentials**.
