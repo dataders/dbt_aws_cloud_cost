@@ -113,14 +113,17 @@ CLI doesn't support `type: alt` yet) and a locally-built `adbc_driver_dbt`
   relying on `iceberg_version` to fix it.
 - With that fixed, `daily_overview`'s table creation itself succeeds, but the
   **write-visibility credential propagation step back to Snowflake currently
-  fails**: `Propagation failed for ... Network policy is required` — the
-  Snowflake account's network policy is rejecting connections from wherever
-  the dbt-compute staging service runs. This is a Snowflake account security
-  setting, not a bug in this repo's config; whoever administers the
-  `snowflake_demo` account's network policy needs to allowlist the
-  dbt-compute staging service's egress IP(s) (or loosen the policy) before
+  fails** (confirmed twice, including a `--full-refresh` retry — not a
+  transient blip): `Propagation failed for ... Network policy is required` —
+  the Snowflake account's network policy is rejecting connections from
+  wherever the dbt-compute staging service runs. This is a Snowflake account
+  security setting, not a bug in this repo's config, and not something to fix
+  by editing project files: whoever administers the `snowflake_demo`
+  account's (`oeqikbr-bj94303`) network policy needs to allowlist the
+  dbt-compute staging service's egress IP(s), or loosen the policy, before
   `daily_instance_report`/`daily_product_report` can read `daily_overview`'s
-  rows back through the CLD. Not yet re-verified end-to-end past this point.
+  rows back through the CLD. **This is the one remaining blocker on this
+  branch** — everything else in the DAG is verified working.
 
 ## Quick start
 
