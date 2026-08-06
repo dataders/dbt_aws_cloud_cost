@@ -76,7 +76,7 @@ Snowflake/CLD is involved (Scenario 2); irrelevant for Scenario 1.
 | Grants / contracts / constraints / persist_docs | Config accepted; execution path bypasses macro dispatch entirely — moderate-confidence silent no-op, not an error |
 | Write-target catalog types | `iceberg_rest`, `horizon` only — others (`glue`, `unity`, `ducklake`) hit a hard `unimplemented!()` panic |
 | Mixed-compute DAGs | Supported via the catalog-reachability resolver rule above |
-| Driver distribution | No CDN release yet — requires a locally-built `adbc_driver_dbt` |
+| Driver distribution | Available via the driver CDN — no local build required |
 
 This table describes the **routing** path only. Scenario 1 below uses the
 other, unmaintained mechanism (bare `type: alt` default target, no routing) —
@@ -109,10 +109,10 @@ Scenario 2's per-model `catalog_name`/`alt_compute` overrides).
 - Models: plain `+materialized: table` (`main`'s current baseline), no
   per-model catalog config.
 - README: new section documenting this path, its prerequisites (fs-built
-  `dbt` binary, locally-built `adbc_driver_dbt`, the five `DBT_COMPUTE_*` env
-  vars above), and the explicit caveat that this is the less-exercised of the
-  two Alt patterns (see Background — the feature-support table doesn't apply
-  here).
+  `dbt` binary — the ADBC driver itself comes from the driver CDN, no local
+  build needed — plus the five `DBT_COMPUTE_*` env vars above), and the
+  explicit caveat that this is the less-exercised of the two Alt patterns
+  (see Background — the feature-support table doesn't apply here).
 
 ## Scenario 2: `add-mdls-dbt-compute-target` branch (continued)
 

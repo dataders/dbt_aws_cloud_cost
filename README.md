@@ -54,9 +54,9 @@ and an **uppercase** target schema (`CATALOG_SCHEMA=AWS_CLOUD_COST`) — see
 separate target tracked in
 [#2](https://github.com/dataders/dbt_aws_cloud_cost/issues/2).
 
-### dbt-compute (Alt engine) feature support
+### Lake Compute (Alt engine) feature support
 
-This branch also demonstrates Fivetran's internal, staging-only dbt-compute
+This branch also demonstrates Fivetran's internal, staging-only Lake Compute
 service (an "Alt engine" `type: alt` dbt adapter). There's no public
 documentation for it, so the table below is sourced directly from the
 `fs`/`quack` codebases. It describes the `+alt_compute: alt` **routing** path
@@ -78,7 +78,7 @@ README for its own findings.
 | Grants / contracts / constraints / persist_docs | Config accepted; the execution path bypasses macro dispatch entirely and never references them — moderate-confidence silent no-op, not an error |
 | Write-target catalog types | `iceberg_rest`, `horizon` only — `glue`/`unity`/`ducklake` hit a hard `unimplemented!()` panic |
 | Mixed-compute DAGs | Supported via a resolver rule: any `alt_compute: alt` model's upstreams must each be catalog-attached (`catalog_name` set, `table_format: iceberg`, or themselves `alt_compute: alt`) — otherwise a hard parse error |
-| Driver distribution | No CDN release yet — requires a locally-built `adbc_driver_dbt` |
+| Driver distribution | Available via the driver CDN — no local build required |
 
 Full investigation, including file:line citations into the `fs`/`quack`
 source: `docs/superpowers/specs/2026-08-04-mdls-dbt-compute-scenarios-design.md`.
@@ -94,11 +94,10 @@ stg_report (Snowflake, catalog_name=mdls)
       -> daily_instance_report, daily_product_report (Snowflake, catalog_name=mdls)  [read back via CLD]
 ```
 
-Required env vars: the `SNOWFLAKE_*` and `DBT_COMPUTE_*` sections of
+Required env vars: the `SNOWFLAKE_*` and `LAKE_COMPUTE_*` sections of
 `.env.example`. Prerequisites: an fs-built `dbt` binary (the published CDN
-CLI doesn't support `type: alt` yet) and a locally-built `adbc_driver_dbt`
-(`quack/scripts/build-adbc-driver-local.sh`), pointed at via
-`ADBC_REPOSITORY` + `DISABLE_AUTO_DRIVER_REBUILD=true`.
+CLI doesn't support `type: alt` yet) — the ADBC driver itself is fetched from
+the driver CDN automatically, no local build needed.
 
 **Verified status — full happy path confirmed end-to-end for real**, `dbt seed && dbt run`
 against the staging service (not just eyeballed as YAML): all 4 models
@@ -122,7 +121,7 @@ worth knowing if you're setting this up yourself:
    network policy to exist before a PAT can be minted, independent of any
    specific IP allowlisting. Once one existed, the real failure was the
    *specific* connecting IP not being in it (`Incoming request with IP/Token
-   ... is not allowed`) — add the dbt-compute service's actual egress IP,
+   ... is not allowed`) — add the Lake Compute service's actual egress IP,
    confirmed empirically rather than guessed from Fivetran's public connector
    IP list (that list is for the standard ELT connectors; this PrPr service's
    egress IP isn't published there).
