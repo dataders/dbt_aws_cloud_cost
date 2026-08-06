@@ -6,20 +6,20 @@
 ## no network call at creation, and is required by the lakekeeper target.
 aws_cloud_cost:
   target: snowflake_demo
-  x_alt_target: dbt_compute
+  x_alt_target: lake_compute
   outputs:
-    ## dbt-compute (Alt engine) — queries the opening_pulling MDLS destination
-    ## via the staging dbt-compute service. Needs DBT_COMPUTE_AUTH_TOKEN (a
-    ## minted JWT) + DBT_COMPUTE_ORG from the env; see polaris.envrc /
+    ## Lake Compute (Alt engine) — queries the opening_pulling MDLS destination
+    ## via the staging Lake Compute service. Needs LAKE_COMPUTE_AUTH_TOKEN (a
+    ## minted JWT) + LAKE_COMPUTE_ORG from the env; see polaris.envrc /
     ## dbt-aws-cloud-cost.envrc in the private overlay.
-    dbt_compute:
+    lake_compute:
       type: alt
       method: token
-      base_url: "{{ env_var('DBT_COMPUTE_BASE_URL') }}"
-      token: "{{ env_var('DBT_COMPUTE_AUTH_TOKEN') }}"
-      organization: "{{ env_var('DBT_COMPUTE_ORG') }}"
-      database: "{{ env_var('DBT_COMPUTE_DATABASE') }}"
-      schema: "{{ env_var('DBT_COMPUTE_SCHEMA') }}"
+      base_url: "{{ env_var('LAKE_COMPUTE_BASE_URL') }}"
+      token: "{{ env_var('LAKE_COMPUTE_AUTH_TOKEN') }}"
+      organization: "{{ env_var('LAKE_COMPUTE_ORG') }}"
+      database: "{{ env_var('LAKE_COMPUTE_DATABASE') }}"
+      schema: "{{ env_var('LAKE_COMPUTE_SCHEMA') }}"
       threads: 4
     ## snowflake_demo — native Snowflake output against the catalog-linked
     ## database created from the Snowflake catalog integration pointed at the

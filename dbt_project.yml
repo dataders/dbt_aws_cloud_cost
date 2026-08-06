@@ -8,7 +8,7 @@ models:
   aws_cloud_cost:
     ## Must match the single uncommented catalog in catalogs.yml.
     ## Valid names: ducklake | lakekeeper | horizon | mdls | unity | s3_tables
-    ## Commented out for the dbt_compute (Alt engine) test run — build_relation_catalog
+    ## Commented out for the lake_compute (Alt engine) test run — build_relation_catalog
     ## can't be invoked by the Alt adapter.
     # +catalog_name: mdls
     +schema: aws_cloud_cost
