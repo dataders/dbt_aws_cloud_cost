@@ -1,8 +1,6 @@
 {{
     config(
         materialized='table',
-        catalog_name='mdls',
-        iceberg_version='3',
     )
 }}
 
