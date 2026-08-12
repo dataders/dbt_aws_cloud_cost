@@ -88,14 +88,14 @@ undocumented upstream.
 Branched from `main` (not from the mixed-compute branch — avoids carrying
 Scenario 2's per-model `catalog_name`/`alt_compute` overrides).
 
-- `profiles.yml`: `main`'s profile is DuckDB-only today (no `dbt_compute`
-  output exists there yet). Port the `dbt_compute` output block from this
+- `profiles.yml`: `main`'s profile is DuckDB-only today (no `lake_compute`
+  output exists there yet). Port the `lake_compute` output block from this
   branch's history (introduced in `8ef7b64`, base URL fixed in `2b97751`)
   over onto `main`'s profile, then point `target` directly at it (no
   `x_alt_target`) — same connection fields as it has today: `base_url`,
   `method: token`, `token`, `organization`, `database`, `schema`, `threads`,
-  sourced from `DBT_COMPUTE_BASE_URL`, `DBT_COMPUTE_AUTH_TOKEN`,
-  `DBT_COMPUTE_ORG`, `DBT_COMPUTE_DATABASE`, `DBT_COMPUTE_SCHEMA`.
+  sourced from `LAKE_COMPUTE_BASE_URL`, `LAKE_COMPUTE_AUTH_TOKEN`,
+  `LAKE_COMPUTE_ORG`, `LAKE_COMPUTE_DATABASE`, `LAKE_COMPUTE_SCHEMA`.
 - `dbt_project.yml`: no `+catalog_name`, no `+alt_compute` anywhere;
   `use_catalogs_v2` off (not needed — routing is the only thing that requires
   it).
@@ -110,7 +110,7 @@ Scenario 2's per-model `catalog_name`/`alt_compute` overrides).
   per-model catalog config.
 - README: new section documenting this path, its prerequisites (fs-built
   `dbt` binary — the ADBC driver itself comes from the driver CDN, no local
-  build needed — plus the five `DBT_COMPUTE_*` env vars above), and the
+  build needed — plus the five `LAKE_COMPUTE_*` env vars above), and the
   explicit caveat that this is the less-exercised of the two Alt patterns
   (see Background — the feature-support table doesn't apply here).
 
@@ -143,7 +143,7 @@ needed:
   catalog block) as part of this work.
 - `profiles.yml` / `catalogs.yml` / `dbt_project.yml`: no structural changes
   beyond what's already there (target `snowflake_demo`, `x_alt_target:
-  dbt_compute`, `mdls` catalog block).
+  lake_compute`, `mdls` catalog block).
 - README: new section documenting this 3-stage scenario with the DAG diagram
   above.
 
@@ -157,7 +157,7 @@ already has, rather than eyeballed as YAML:
   libadbc_driver_dbt.dylib` (via `ADBC_REPOSITORY`)
 
 Following the env-var pattern from `quack/examples/*/run-staging.sh`
-(`DBT_COMPUTE_AUTH_TOKEN`, `DBT_COMPUTE_BASE_URL`, Snowflake key-pair vars,
+(`LAKE_COMPUTE_AUTH_TOKEN`, `LAKE_COMPUTE_BASE_URL`, Snowflake key-pair vars,
 `ADBC_REPOSITORY`, `DISABLE_AUTO_DRIVER_REBUILD=true`). `dbt seed && dbt run`
 on each branch; confirm rows land in the expected destination for each stage.
 
