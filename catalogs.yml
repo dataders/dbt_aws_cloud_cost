@@ -7,5 +7,5 @@ catalogs:
     table_format: iceberg
     config:
       snowflake:
-        catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE_HORIZON', 'CODEX_HORIZON_DEMO') }}"
+        catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE') }}"
         external_volume: "{{ env_var('SNOWFLAKE_EXTERNAL_VOLUME', 'SNOWFLAKE_MANAGED') }}"
