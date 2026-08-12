@@ -3,7 +3,7 @@
   into the built-in DuckDB catalog by `dbt seed`. Final-model output routes
   through catalogs v2 (+catalog_name in dbt_project.yml).
 -#}
-{{ config(catalog_name='mdls') }}
+{{ config(catalog_name='horizon') }}
 with source as (
 
     select *

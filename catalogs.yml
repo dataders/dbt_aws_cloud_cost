@@ -2,9 +2,21 @@
 ## uncommented, matching +catalog_name in dbt_project.yml.
 
 catalogs:
-  - name: mdls
-    type: iceberg_rest
+  ## Spike: the Alt engine (Lake Compute) attaches this catalog directly,
+  ## authenticating with the profile's default Snowflake target's key-pair
+  ## (no separate secret/token config needed here) -- no MDLS/Polaris
+  ## involved. Writes land as native Snowflake-managed Iceberg tables.
+  - name: horizon
+    type: horizon
     table_format: iceberg
     config:
       snowflake:
-        catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE') }}"
+        catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE_HORIZON', 'CODEX_HORIZON_DEMO') }}"
+        external_volume: "{{ env_var('SNOWFLAKE_EXTERNAL_VOLUME', 'SNOWFLAKE_MANAGED') }}"
+
+#   - name: mdls
+#     type: iceberg_rest
+#     table_format: iceberg
+#     config:
+#       snowflake:
+#         catalog_database: "{{ env_var('SNOWFLAKE_CATALOG_DATABASE') }}"

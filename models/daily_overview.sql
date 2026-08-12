@@ -2,7 +2,7 @@
     config(
         materialized='table',
         alt_compute='alt',
-        catalog_name='mdls',
+        catalog_name='horizon',
     )
 }}
 
