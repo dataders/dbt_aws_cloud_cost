@@ -3,11 +3,7 @@
   into the built-in DuckDB catalog by `dbt seed`. Final-model output routes
   through catalogs v2 (+catalog_name in dbt_project.yml).
 -#}
-{#- Iceberg v2 caps timestamp precision at microseconds; fs/Snowflake
-   auto-injects a nanosecond-precision _MODIFIED column, which v2 rejects
-   (091385). v3 supports nanosecond precision. See:
-   https://dbt-labs.slack.com/archives/C092VTNF0KV/p1784829320805829 -#}
-{{ config(catalog_name='mdls', iceberg_version='3') }}
+{{ config(catalog_name='mdls') }}
 with source as (
 
     select *
