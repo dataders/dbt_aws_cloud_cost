@@ -1,9 +1,9 @@
 # dbt + MDLS + Lake Compute demo (AWS cloud cost)
 
 A dbt project demonstrating Fivetran's Managed Data Lake Service (MDLS) and
-its internal, staging-only **Lake Compute** service (a `type: lakecompute`
-dbt-fusion adapter) alongside native Snowflake, using dbt-fusion 2.0's
-multi-adapter profile targets.
+its internal **Lake Compute** service (a `type: lakecompute` dbt-fusion
+adapter) alongside native Snowflake, using dbt-fusion 2.0's multi-adapter
+profile targets.
 
 The source data is a mocked version of AWS's Cost & Usage Report pipeline.
 The models are adapted from Fivetran's
@@ -51,7 +51,7 @@ sourced directly from the `fs`/`quack` codebases.
 | Write-target catalog types | `iceberg_rest`, `horizon` only — `glue`/`unity`/`ducklake` hit a hard `unimplemented!()` panic |
 | Mixed-compute DAGs | Supported via a resolver rule: any `adapter: lakecompute` model's upstreams must each be catalog-attached or themselves `adapter: lakecompute` — otherwise a hard parse error |
 | Driver distribution | Available via the driver CDN — no local build of the ADBC driver required (the `dbt` binary itself does — see [Install dbt](#install-dbt)) |
-| Auth methods | `token` (a bearer token used as-is — **this is what actually works against staging today**, see [Verified status](#verified-status)); `api_key`; `okta_browser`; `fivetran` (`fivetran_credential` + `fivetran_api_url` — a PAT→JWT exchange added in [fs#14421](https://github.com/dbt-labs/fs/pull/14421), intended for `dct_...` self-service tokens, but staging doesn't accept the resulting JWT yet) |
+| Auth methods | `fivetran` (`fivetran_credential` — a `dct_...` self-service PAT, exchanged for a short-lived JWT; added in [fs#14421](https://github.com/dbt-labs/fs/pull/14421) — **this is the one to use, against `base_url: https://api.lake-compute.fivetran.com/`**, see [Verified status](#verified-status)); `token` (a bearer JWT used as-is); `api_key`; `okta_browser` |
 
 `lakecompute` was renamed from `alt`/`lake_compute` in
 [dbt-labs/fs#14380](https://github.com/dbt-labs/fs/pull/14380). As of
@@ -77,23 +77,29 @@ Getting there required two fixes beyond this repo's SQL/config alone — worth
 knowing if you're setting this up against a fresh account or a fresh
 `LAKE_COMPUTE_AUTH_TOKEN`:
 
-1. **Auth method: `token`, not `fivetran` — for now.** The intended long-term
-   path for a `dct_...` self-service PAT is `method: fivetran` +
-   `fivetran_credential` (a PAT→JWT exchange, see
-   [fs#14421](https://github.com/dbt-labs/fs/pull/14421) and
-   `quack/docs/authentication.md`). As of 2026-09-05 that exchange's Layer A
-   succeeds (`POST https://api.fivetran.com/partner/v1/dbt-compute/token-exchange`
-   with `{"credential": "<pat>"}` returns a valid JWT), but the staging Lake
-   Compute deployment's Layer B rejects every JWT that flow produces with
-   `401 invalid token` on the real endpoint
-   (`POST https://api.dbt-compute.staging.fivetran.com/queries`) — confirmed
-   with raw `curl`, independent of dbt/fs. The self-service PAT/JWT interface
-   simply isn't fully deployed to staging yet (Fivetran was actively building
-   it in `#prj_lake_compute` the same evening). **What works right now:** an
-   older-style, directly-usable bearer JWT (handrolled HS256, scoped to the
-   `opening_pulling` group) via plain `method: token` + `token:` — see
-   `profiles.yml`. Switch back to `method: fivetran` once staging accepts
-   those JWTs.
+1. **Don't set `LAKE_COMPUTE_BASE_URL` at all** — leave it unset so the
+   `lakecompute` connection falls back to its built-in default, Fivetran's
+   **production** dbt-compute API (`https://api.lake-compute.fivetran.com/`).
+   Earlier revisions of this demo pinned it explicitly to the **staging**
+   host (`api.dbt-compute.staging.fivetran.com`), and `method: fivetran` +
+   `fivetran_credential` (a `dct_...` self-service PAT, exchanged for a
+   short-lived JWT — see [fs#14421](https://github.com/dbt-labs/fs/pull/14421)
+   and `quack/docs/authentication.md`) 401s there: Layer A (`POST
+   https://api.fivetran.com/partner/v1/dbt-compute/token-exchange`) succeeds
+   and returns a valid, correctly-scoped JWT, but staging's own JWT
+   verification rejects it before the request ever reaches Fivetran's
+   credential-vending endpoint — confirmed with raw `curl` at every hop,
+   independent of dbt/fs. Against production, the identical JWT is accepted
+   (`202`) and the full flow (auth, query execution, credential vending,
+   propagation back to Snowflake) works end-to-end — this matches
+   `quack/docs/dbt-compute-production-fivetran-auth-test-report-2026-09-02.md`,
+   which independently validated the same production path. So the fix is
+   just the base URL (by omission), not the credential, the auth method, or
+   anything else in this repo's dbt config. Do **not** skip `database`/
+   `schema` on the `lakecompute` connection, though — they're the MDLS-side
+   namespace and don't inherit from the `snowflake` connection; omitting
+   them makes `dbt debug`'s write succeed but its read-back fail (write and
+   read silently land in different implicit namespaces).
 2. **Snowflake network policy** (account-side, not this repo). LakeCompute's
    write-visibility propagation step back to Snowflake failed with
    `Propagation failed for ... Network policy is required` until *some*
@@ -198,12 +204,15 @@ DATABASE SEEDS`) and `USAGE` on the warehouse.
 
 ### Lake Compute
 
-`LAKE_COMPUTE_AUTH_TOKEN` is a directly-usable bearer JWT, used via `method:
-token` in `profiles.yml` — see [Verified status](#verified-status) for why
-(the `dct_...` self-service-PAT path isn't accepted by staging yet).
-`LAKE_COMPUTE_DATABASE`/`LAKE_COMPUTE_SCHEMA` are the MDLS-side namespace
-LakeCompute writes into. The connecting Snowflake user also needs a network
-policy assigned (see [Verified status](#verified-status), point 2).
+`LAKE_COMPUTE_AUTH_TOKEN` is a `dct_...` self-service PAT, minted from the
+MDLS destination's UI ("Write credentials" tab), used via `method: fivetran`
++ `fivetran_credential` in `profiles.yml`. Don't set a `base_url` for this
+connection — the default is Fivetran's **production** dbt-compute API, which
+is the one that works (see [Verified status](#verified-status) for why the
+staging host doesn't). `LAKE_COMPUTE_DATABASE`/`LAKE_COMPUTE_SCHEMA` are the
+MDLS-side namespace LakeCompute writes into — required, and don't inherit
+from the Snowflake connection. The connecting Snowflake user also needs a
+network policy assigned (see [Verified status](#verified-status), point 2).
 
 ## Regenerating the seed
 
@@ -219,10 +228,14 @@ from this repo; reintroduce a generator separately if you need fresh data.
 - **`Database 'SEEDS' does not exist or not authorized`** — set
   `SNOWFLAKE_SEED_DATABASE` to a database you actually have `CREATE SCHEMA`
   on (the default, `SEEDS`, may not exist / be granted on a shared account).
-- **LakeCompute connection test fails / 401 invalid token** — if you're on
-  `method: fivetran`, switch to `method: token` (see
-  [Verified status](#verified-status)); staging doesn't accept the
-  PAT→JWT-exchange flow's JWTs yet, independent of any `profiles.yml` change.
+- **LakeCompute connection test fails / 401 invalid token** — if
+  `LAKE_COMPUTE_BASE_URL` is set to the staging host
+  (`api.dbt-compute.staging.fivetran.com`), unset it; the default is
+  Fivetran's production dbt-compute API, which is the one that works (see
+  [Verified status](#verified-status)).
+- **MDLS write succeeds but the read-back fails (`Table ... does not
+  exist`)** — the `lakecompute` connection is missing `database`/`schema`;
+  they don't inherit from the `snowflake` connection and are required.
 - **`Propagation failed for ... Network policy is required`** — assign any
   network policy to the connecting Snowflake user (see
   [Verified status](#verified-status), point 2); an account admin has to do
