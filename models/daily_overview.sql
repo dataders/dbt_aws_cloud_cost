@@ -1,8 +1,8 @@
 {{
     config(
         materialized='table',
-        alt_compute='alt',
-        catalog_name='mdls',
+        adapter='lakecompute',
+        propagate='snowflake',
     )
 }}
 
@@ -78,17 +78,17 @@ billing_account_names as (
 
 fields as (
 
-    {#- The Alt engine's write path derives each output column's stored name
-       from how it's selected: a bare passthrough column keeps whatever case
-       the upstream (native-Snowflake, auto-uppercased) table already stores
-       it in, but an explicit alias is preserved exactly as written -- it does
-       NOT get auto-uppercased the way it would on a plain Snowflake CTAS.
-       Left alone, that produces a table with MIXED case (uppercase
-       passthroughs, lowercase computed columns), which then breaks downstream
-       native-Snowflake reads of the computed columns (unquoted references
-       auto-uppercase and no longer match). Every computed/aliased column
-       below is therefore explicitly aliased in UPPERCASE to match the
-       passthrough columns' casing. -#}
+    {#- The LakeCompute adapter's write path derives each output column's
+       stored name from how it's selected: a bare passthrough column keeps
+       whatever case the upstream (native-Snowflake, auto-uppercased) table
+       already stores it in, but an explicit alias is preserved exactly as
+       written -- it does NOT get auto-uppercased the way it would on a
+       plain Snowflake CTAS. Left alone, that produces a table with MIXED
+       case (uppercase passthroughs, lowercase computed columns), which then
+       breaks downstream native-Snowflake reads of the computed columns
+       (unquoted references auto-uppercase and no longer match). Every
+       computed/aliased column below is therefore explicitly aliased in
+       UPPERCASE to match the passthrough columns' casing. -#}
     select
         source_report.source_relation,
         report,
@@ -96,10 +96,11 @@ fields as (
         {# Period Details #}
         cast({{ dbt.date_trunc('day', 'usage_start_date') }} as date) as "USAGE_START_DATE",
         cast({{ dbt.date_trunc('day', 'usage_end_date') }} as date) as "USAGE_END_DATE",
-        {#- Iceberg v2 caps timestamp precision at microseconds (the Alt
-           engine's write path always creates v2 tables regardless of this
-           model's iceberg_version='3' config -- that setting doesn't
-           propagate through the Alt write path); billing_period_start/end_date
+        {#- Iceberg v2 caps timestamp precision at microseconds (the
+           LakeCompute adapter's write path always creates v2 tables
+           regardless of this model's iceberg_version='3' config -- that
+           setting doesn't propagate through the LakeCompute write path);
+           billing_period_start/end_date
            are nanosecond-precision TIMESTAMP_NTZ(9) from the upstream
            timestamp_type cast, so truncate to date here the same way the
            usage dates already are. -#}

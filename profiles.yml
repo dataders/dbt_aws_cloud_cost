@@ -5,34 +5,46 @@
 ## with their catalog block. minio_secret stays active — it is static, makes
 ## no network call at creation, and is required by the lakekeeper target.
 aws_cloud_cost:
-  target: snowflake_demo
-  x_alt_target: lake_compute
+  target: prod
   outputs:
-    ## Lake Compute (Alt engine) — queries the opening_pulling MDLS destination
-    ## via the staging Lake Compute service. Needs LAKE_COMPUTE_AUTH_TOKEN (a
-    ## minted JWT) + LAKE_COMPUTE_ORG from the env; see polaris.envrc /
-    ## dbt-aws-cloud-cost.envrc in the private overlay.
-    lake_compute:
-      type: alt
-      method: token
-      base_url: "{{ env_var('LAKE_COMPUTE_BASE_URL') }}"
-      token: "{{ env_var('LAKE_COMPUTE_AUTH_TOKEN') }}"
-      organization: "{{ env_var('LAKE_COMPUTE_ORG') }}"
-      database: "{{ env_var('LAKE_COMPUTE_DATABASE') }}"
-      schema: "{{ env_var('LAKE_COMPUTE_SCHEMA') }}"
-      threads: 4
-    ## snowflake_demo — native Snowflake output against the catalog-linked
-    ## database created from the Snowflake catalog integration pointed at the
-    ## opening_pulling MDLS destination. Key-pair auth (password 403s here);
-    ## creds come from the "MDLS Compute (Snowflake)" 1Password item. See
-    ## .env.example for the SNOWFLAKE_* vars.
-    snowflake_demo:
-      type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
-      user: "{{ env_var('SNOWFLAKE_USER') }}"
-      private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
-      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
-      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
-      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
-      threads: 4
+    ## `prod` is a multi-adapter target (dbt-fusion 2.0 catalogs v2 / profiles
+    ## v2): one target, two adapter connections. The `snowflake` entry is the
+    ## default (native Snowflake, used by every model without an explicit
+    ## `adapter` config); `lakecompute` is opted into per-model via
+    ## `+adapter: lakecompute` (see models/daily_overview.sql). Requires an
+    ## fs build off latest main — the published CLI doesn't know `lakecompute`
+    ## yet.
+    prod:
+      ## snowflake — native Snowflake output against the catalog-linked
+      ## database created from the Snowflake catalog integration pointed at
+      ## the opening_pulling MDLS destination. Key-pair auth (password 403s
+      ## here); creds come from the "dbt_aws_cloud_cost - all env vars
+      ## (opening_pulling)" 1Password item. See .env.example for the
+      ## SNOWFLAKE_* vars.
+      - type: snowflake
+        default: true
+        account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+        user: "{{ env_var('SNOWFLAKE_USER') }}"
+        private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
+        role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+        database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+        schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+        warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+        threads: 4
+      ## lakecompute — queries the opening_pulling MDLS destination via the
+      ## staging Lake Compute service. `method: fivetran` (a `dct_...`
+      ## self-service PAT exchanged for a JWT per quack/docs/authentication.md
+      ## Layer A/B) is the *intended* long-term auth path, but as of
+      ## 2026-09-05 the staging deployment's Layer B JWT verification rejects
+      ## every JWT that flow produces (confirmed with raw `curl`, independent
+      ## of dbt) -- the self-service PAT/JWT interface isn't fully deployed to
+      ## staging yet. Until it is, LAKE_COMPUTE_AUTH_TOKEN is a directly-usable
+      ## bearer JWT (the older handrolled-HS256 shape, minted for the
+      ## `opening_pulling` group) and `method: token` is what actually works
+      ## against staging right now.
+      - type: lakecompute
+        method: token
+        base_url: "{{ env_var('LAKE_COMPUTE_BASE_URL') }}"
+        token: "{{ env_var('LAKE_COMPUTE_AUTH_TOKEN') }}"
+        database: "{{ env_var('LAKE_COMPUTE_DATABASE') }}"
+        schema: "{{ env_var('LAKE_COMPUTE_SCHEMA') }}"

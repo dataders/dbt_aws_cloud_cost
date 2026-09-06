@@ -1,9 +1,11 @@
 {#-
   The demo's source is the committed seed (seeds/aws_cost_report.csv), loaded
-  into the built-in DuckDB catalog by `dbt seed`. Final-model output routes
-  through catalogs v2 (+catalog_name in dbt_project.yml).
+  by `dbt seed` into the default (native Snowflake) connection.
+  `table_format='iceberg'` (no `catalog_name`/CLD needed) makes this a valid
+  upstream for daily_overview's `adapter: lakecompute` -- LakeCompute models
+  require every upstream to be catalog-attached in some form.
 -#}
-{{ config(catalog_name='mdls') }}
+{{ config(table_format='iceberg') }}
 with source as (
 
     select *

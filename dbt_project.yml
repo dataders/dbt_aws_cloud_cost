@@ -6,11 +6,6 @@ profile: aws_cloud_cost
 
 models:
   aws_cloud_cost:
-    ## Must match the single uncommented catalog in catalogs.yml.
-    ## Valid names: ducklake | lakekeeper | horizon | mdls | unity | s3_tables
-    ## Commented out for the lake_compute (Alt engine) test run — build_relation_catalog
-    ## can't be invoked by the Alt adapter.
-    # +catalog_name: mdls
     +schema: aws_cloud_cost
     +materialized: table
 
@@ -20,7 +15,7 @@ models:
 seeds:
   aws_cloud_cost:
     ## Seeds go into a plain (non-Iceberg) database — the catalog-linked
-    ## database (snowflake_demo's default) rejects multi-statement
+    ## database (the `snowflake` connection's default) rejects multi-statement
     ## transactions on unmanaged Iceberg tables, which seed loads use.
     +database: "{{ env_var('SNOWFLAKE_SEED_DATABASE', 'SEEDS') }}"
     +schema: aws_cloud_cost
