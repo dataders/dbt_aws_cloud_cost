@@ -10,6 +10,7 @@ aws_cloud_cost:
         account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
         user: "{{ env_var('SNOWFLAKE_USER') }}"
         private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
+        method: keypair
         role: "{{ env_var('SNOWFLAKE_ROLE') }}"
         database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
         schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
