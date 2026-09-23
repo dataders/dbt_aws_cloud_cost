@@ -1,8 +1,7 @@
 {{
     config(
         materialized='table',
-        adapter='lakecompute',
-        propagate='snowflake',
+        adapter='lakecompute'
     )
 }}
 
