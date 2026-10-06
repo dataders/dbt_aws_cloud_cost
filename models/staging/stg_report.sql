@@ -5,7 +5,7 @@
   upstream for daily_overview's `adapter: lakecompute` -- LakeCompute models
   require every upstream to be catalog-attached in some form.
 -#}
-{{ config(table_format='iceberg') }}
+{{ config(catalog_name='quack_demo_cat', table_format='iceberg') }}
 with source as (
 
     select *

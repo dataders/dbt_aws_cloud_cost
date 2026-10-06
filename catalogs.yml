@@ -12,3 +12,10 @@ catalogs:
         catalog_database: "{{ env_var('DATABRICKS_CATALOG') }}"
         region: "{{ env_var('DATABRICKS_DEFAULT_REGION') }}"
         host: "{{ env_var('DATABRICKS_HOST') | replace('https://', '') }}"
+      ## stg_report (catalog_name: quack_demo_cat) builds here as Delta +
+      ## UniForm. As managed Iceberg, lakecompute's attach fails with "Default
+      ## schema for catalog '__uc_raw_…' not found".
+      databricks:
+        catalog_database: "{{ env_var('DATABRICKS_CATALOG') }}"
+        file_format: delta
+        use_uniform: true
