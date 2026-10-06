@@ -3,6 +3,15 @@ version: 2
 models:
   - name: stg_report
     description: '{{ doc("aws_cloud_cost_report") }}'
+    config:
+      ## The lakecompute engine's parser rejects Databricks backtick-quoted
+      ## refs: relation references render with the referenced node's adapter,
+      ## and daily_overview (adapter='lakecompute') reads this model. Render
+      ## it unquoted; all identifiers are lowercase.
+      quoting:
+        database: false
+        schema: false
+        identifier: false
     columns:
       - name: source_relation
         description: "{{ doc('source_relation') }}"

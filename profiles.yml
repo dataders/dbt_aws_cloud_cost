@@ -5,20 +5,22 @@ aws_cloud_cost:
   outputs:
 
     prod:
-      - type: snowflake
+      - type: databricks
         default: true
-        account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
-        user: "{{ env_var('SNOWFLAKE_USER') }}"
-        private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
-        method: keypair
-        role: "{{ env_var('SNOWFLAKE_ROLE') }}"
-        database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-        schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
-        warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+        host: "{{ env_var('DATABRICKS_HOST') }}"
+        http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+        token: "{{ env_var('DATABRICKS_TOKEN') }}"
+        database: "{{ env_var('DATABRICKS_CATALOG') }}"
+        schema: "{{ env_var('DATABRICKS_SCHEMA', 'aws_cloud_cost') }}"
         threads: 4
 
       - type: lakecompute
+        ## The Snowflake demo used production Lake Compute by default. This
+        ## PAT is a staging token: staging PATs must exchange at api-staging
+        ## (production returns 401) and hit the staging dbt-compute API.
         method: fivetran
+        base_url: "{{ env_var('LAKE_COMPUTE_BASE_URL', 'https://api.dbt-compute.staging.fivetran.com/') }}"
         fivetran_credential: "{{ env_var('LAKE_COMPUTE_AUTH_TOKEN') }}"
+        fivetran_auth_url: "{{ env_var('LAKE_COMPUTE_AUTH_URL', 'https://api-staging.fivetran.com') }}"
         database: "{{ env_var('LAKE_COMPUTE_DATABASE') }}"
         schema: "{{ env_var('LAKE_COMPUTE_SCHEMA') }}"

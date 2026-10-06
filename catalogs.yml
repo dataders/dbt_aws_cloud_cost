@@ -1,0 +1,14 @@
+## Lets the lakecompute engine read the project's Databricks upstreams: the
+## backend attaches the Unity Catalog named in `catalog_database` using the
+## profile's databricks credential (required since stg_report lives there).
+## Read-only as a model target; credentials come from the profile connection.
+
+catalogs:
+  - name: quack_demo_cat
+    type: unity
+    table_format: iceberg
+    config:
+      lakecompute:
+        catalog_database: quack_demo
+        region: us-east-1
+        host: dbc-ef441400-292f.cloud.databricks.com

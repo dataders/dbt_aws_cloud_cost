@@ -14,10 +14,10 @@ models:
 
 seeds:
   aws_cloud_cost:
-    ## Seeds go into a plain (non-Iceberg) database — the catalog-linked
-    ## database (the `snowflake` connection's default) rejects multi-statement
-    ## transactions on unmanaged Iceberg tables, which seed loads use.
-    +database: "{{ env_var('SNOWFLAKE_SEED_DATABASE', 'SEEDS') }}"
+    ## The Snowflake demo routed seeds to a separate database because the
+    ## catalog-linked database rejects multi-statement transactions on
+    ## unmanaged Iceberg tables. Databricks seeds are managed Delta tables
+    ## with no such constraint, so they load into the default catalog.
     +schema: aws_cloud_cost
 
 vars:
