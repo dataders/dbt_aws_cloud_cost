@@ -9,6 +9,6 @@ catalogs:
     table_format: iceberg
     config:
       lakecompute:
-        catalog_database: quack_demo
-        region: us-east-1
-        host: dbc-ef441400-292f.cloud.databricks.com
+        catalog_database: "{{ env_var('DATABRICKS_CATALOG') }}"
+        region: "{{ env_var('DATABRICKS_DEFAULT_REGION') }}"
+        host: "{{ env_var('DATABRICKS_HOST') | replace('https://', '') }}"
